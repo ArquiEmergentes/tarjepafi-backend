@@ -74,13 +74,13 @@ It is written so that any team member (or their coding agent) can pick up where 
 | Tests | JUnit 5, Mockito, Testcontainers (PostgreSQL, RabbitMQ), the web app's Playwright-BDD `@integration` features as contract tests |
 | Firmware | C++ / Arduino framework, ESP32 DevKit, PlatformIO project that also runs in Wokwi |
 | Local infra | Docker Compose |
-| Deploy | Azure App Service (container) + Azure Database for PostgreSQL; RabbitMQ on CloudAMQP or an Azure container |
+| Deploy | Azure App Service B1 (backend container from GitHub Container Registry) + Neon free PostgreSQL + RabbitMQ on Azure Container Instances (revision 3, see phase 2) |
 
 ### Tools a contributor needs
 
 | Tool | Status on the first dev machine (2026-11-15) |
 |---|---|
-| JDK 25 | **Missing** (JDK 24 installed). Until installed, build with `mvn -Djava.version=24 …`. |
+| JDK 25 | Installed (2026-11-16) and first on `PATH`; `JAVA_HOME` may still point at JDK 24, so set it for Maven. `mvn verify` is green on it. |
 | Maven 3.9 | Installed |
 | Docker Desktop | Installed, daemon was stopped |
 | Node 20.19+ / npm | Installed (web app and contract tests) |
@@ -223,12 +223,10 @@ Demo script (the acceptance test of milestone M3):
 
 - **Network.** The browser simulator joins `Wokwi-GUEST` and reaches **the internet only**. The broker must have a
   public MQTT endpoint (D12). Reaching a laptop needs the paid private gateway and is not part of the plan.
-- **Broker options, decide in phase 2** (host, port, user, password and TLS are firmware constants, so the choice
-  does not change code):
-  1. RabbitMQ container with the MQTT plugin on Azure (Container Instances or a small VM), port 8883 with TLS or
-     1883 without. Same image and config as `compose.yaml`. Preferred: it is the stack the report names.
-  2. A managed RabbitMQ (for example CloudAMQP). **Verify first** that the chosen plan exposes MQTT; the MQTT
-     username format is usually `vhost:user`.
+- **Broker (decided 2026-11-16):** RabbitMQ with the MQTT plugin in an Azure Container Instances container, plain MQTT on
+  port 1883 (host, port, user and password are firmware constants). ACI has no TLS ingress: TLS on 8883 would need a
+  certificate baked into the image and is left to phase 9. A managed RabbitMQ (CloudAMQP free) was the zero-cost
+  alternative; it was not chosen because a shared plan probably cannot set `mqtt.exchange`, which this design relies on.
 - **Credentials are visible** to anyone who opens a public Wokwi project. Use a dedicated broker user (`reader-demo`)
   whose permissions are limited to the `tarjepafi.devices` exchange and topics `tarjepafi.readers.*`, and rotate
   its password after each showcase. Never put the backend's broker user in the firmware.
@@ -304,21 +302,29 @@ Registry of the organisation is the default). If these are not ready, **do phase
 1 and 3 need no cloud. The broker is first exercised in the phase 4 Verify block and is mandatory for phase 6, so
 the latest safe moment for this phase is before phase 4 is verified.
 
-Budget notes for the student credit (prices are approximate, check the Azure calculator): the broker must run
-whenever the reader is being tested, so prefer a small Linux VM (B1s/B2s) running the same RabbitMQ container as
-`compose.yaml` with ports 5672 and 1883 open, over Azure Container Instances running around the clock, which
-costs several times more. Stop or deallocate resources between work sessions. Azure for Students restricts the
-regions you may deploy to: pick one the subscription allows and use it for every resource.
+**Revision 3 (2026-11-16, team decision): the environment is temporary and cheap.** It lives for the development
+period, is stopped between sessions, is switched on for the showcase (about 24 hours) and is then deleted. So the
+choices below favour per-hour billing and free tiers over monthly SKUs, and the chosen stack is: **Neon free
+PostgreSQL** (same engine as the code; a TiDB free tier was considered and rejected because it is MySQL-compatible and
+would mean rewriting migrations, drivers and tests), **RabbitMQ on Azure Container Instances** from an image with the
+configuration baked in (`docker/rabbitmq/Dockerfile`; stoppable, billed per second), **App Service B1** for the
+backend container (HTTPS included; the B1 plan bills while it exists, even when the app is stopped) and **GitHub
+Container Registry** (public packages) for both images. Prices were not verified against Microsoft's page: check the
+Azure calculator before creating resources. Azure for Students restricts regions and SKUs per subscription: on
+2026-11-16 Central US and Chile Central allowed everything needed, East US blocked PostgreSQL, and several others
+blocked small VMs.
 
-1. Multi-stage `Dockerfile`; GitHub Actions workflow: build, tests, image, deploy on push to `develop`.
-2. Azure, one resource group `rg-tarjepafi-demo`: App Service (Linux container, B1) for the backend, Azure
-   Database for PostgreSQL Flexible Server (Burstable B1ms), and the broker: a small VM with Docker running
-   `rabbitmq:4-management-alpine` with `docker/rabbitmq/*` mounted (network rule: 5672 and 1883 open, 15672 closed
-   or restricted to the team's IPs). Secrets as app settings; HTTPS only; profiles `demo` on the showcase environment.
-3. Broker users: `tarjepafi-backend` (AMQP, full access to the vhost) and `reader-demo` (MQTT, restricted as in
-   section 6).
+1. Multi-stage `Dockerfile`; GitHub Actions workflow (`.github/workflows/ci.yml`): build and test on every pull
+   request, images pushed on `develop`/`main`, deploy to App Service on `develop` once `AZURE_WEBAPP_NAME` is set.
+2. Resource group `rg-tarjepafi-demo` with the App Service plan and web app, and the ACI broker (ports 5672 and 1883
+   public, 15672 not published). Neon project created by a person. Secrets as app settings; HTTPS only; profile `demo`
+   on the showcase environment. The exact commands are in `docs/DEPLOYMENT.md`.
+3. Broker users: `tarjepafi-backend` (AMQP, administrator, from `RABBITMQ_DEFAULT_USER`) and `reader-demo` (MQTT,
+   restricted as in section 6), created by the image's entrypoint **after the backend has declared the
+   `tarjepafi.devices` exchange** (RabbitMQ only accepts topic permissions on an existing exchange).
 4. Web app: `environment.prod.ts` → deployed API; add the web app's public origin to `CORS_ALLOWED_ORIGINS`.
-5. Document every resource name, URL and setting (not the secrets) in `docs/DEPLOYMENT.md`.
+   Hosting: Azure Static Web Apps (free plan), pending the team's confirmation.
+5. Document every resource name, URL and setting (not the secrets) and the teardown in `docs/DEPLOYMENT.md`.
 
 **Verify:** deployed `/actuator/health` is `UP`; sign-in works from the deployed web app; from any machine,
 `mosquitto_pub`/`mosquitto_sub` with the `reader-demo` user can publish and read `tarjepafi/readers/test/tap`,
@@ -489,8 +495,8 @@ Rules of the refactor:
 
 | # | Item | Owner decision needed |
 |---|---|---|
-| R1 | JDK 25 is not installed on the first dev machine (builds use `-Djava.version=24`). | Install JDK 25 before the CI image is defined in phase 2. |
-| R2 | Public MQTT broker for the showcase. | **Decided 2026-11-15:** RabbitMQ on Azure, paid with the Azure for Students credit (phase 2). |
+| R1 | JDK 25 was missing on the first dev machine. | **Resolved 2026-11-16:** installed; `mvn verify` green on it. Use JDK 25 in the CI image (phase 2). |
+| R2 | Public MQTT broker for the showcase. | **Decided 2026-11-16:** RabbitMQ on Azure Container Instances (stopped between sessions), paid with the Azure for Students credit (phase 2, revision 3). |
 | R3 | Between phases 1 and 7 the web app talks to two APIs (backend + json-server), so the deployed web app is only fully functional for migrated contexts. | Accepted; the showcase needs phases 1–6. |
 | R4 | Wokwi tag UIDs differ from seed UIDs. | Resolved by the seed overlay in phase 6. |
 | R5 | The web app's `develop` reverted the test suite; `feat/connection-tests` has it (same tree as `feat/sprint1-fase7-testing-suite`). | **Decided 2026-11-15:** every web app branch of this plan starts from `feat/connection-tests` and is merged back into it. |

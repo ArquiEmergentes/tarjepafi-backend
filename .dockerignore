@@ -1,0 +1,11 @@
+target/
+.git/
+.github/
+docs/
+firmware/
+.idea/
+.vscode/
+*.iml
+*.log
+.env
+compose.yaml
