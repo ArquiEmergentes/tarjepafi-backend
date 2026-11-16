@@ -9,38 +9,38 @@ How to use this file:
 
 ## Current state
 
-- Date: 2026-11-15
-- Phase 0 is written and verified, but **nothing is committed**: the repo still has no commits and no `develop`
-  branch (step 0.1). All files are untracked in the working tree.
-- The plan is at **revision 2**: the team decided the web app is refactored to fit the backend, so the json-server
-  compatibility layer was dropped and the phases were renumbered (plan D2, D12, D13 and section 7). The goal is a
-  live showcase: public Wokwi project → deployed backend → deployed web app (plan section 6).
-- **Phase 1 backend (steps 1.1 to 1.6) is written and verified**: `users` table, sign-in, JWT, `GET /auth/me`,
-  admin and demo user seeders, problem-details error handler with `code`. `mvn -Djava.version=24 verify` runs 29
-  tests green (12 of them hit the real API on Testcontainers).
-- Step 1.7 (web app sign-in adapter) is **written** on local branch `feature/backend-auth` (off
-  `feat/connection-tests`, uncommitted): `ng build` and the 49 unit tests pass, and the backend side of the
-  contract was exercised with curl (see log). **Not yet checked in a browser**: nobody has signed in through the
-  Angular login screen against the backend, so 1.7 stays unticked.
-- Azure: the team has Azure for Students credit; no resource exists yet. Phase 2 lists what a person must do
-  first (`az login`). If that is not done when you get there, do phase 3 and come back.
-- Phases 2 to 9 are not started. There is no firmware yet. Nothing is deployed.
+- Date: 2026-11-16
+- **Phase 1 is done (milestone M1)**: the web app signs in against the real backend (see the log).
+- **Phase 2 is in progress; nothing exists in Azure yet.** Work is on `feature/demo-environment` (off `develop`,
+  uncommitted). Decisions of 2026-11-16 (plan revision 3): Neon free PostgreSQL, RabbitMQ on Azure Container Instances,
+  backend on App Service B1, images on GitHub Container Registry, everything temporary and deleted after the
+  showcase. Written and verified **locally**: `Dockerfile` (image runs, health UP, sign-in 200, non-root, about 300 MiB),
+  `docker/rabbitmq/` image with the restricted `reader-demo` user (permissions tested with real MQTT clients),
+  Hikari settings for a serverless database, `mvn verify` (29 tests) on JDK 25. Written but **not run anywhere**:
+  `.github/workflows/ci.yml` (YAML parses, never executed on GitHub) and the commands in `docs/DEPLOYMENT.md`.
+- Azure: logged in (`az login`, Azure for Students, 2026-11-16); no resource created; `Microsoft.ContainerInstance`
+  is not registered yet. Region proposed: Central US (not yet confirmed by the team).
+- Git: `main` and `develop` exist. The web app's step 1.7 is commit `6b6add6` on `feat/sprint1-fase7-testing-suite`
+  (pushed); the local branch `feature/backend-auth` points at it.
+- Build: JDK 25 is installed and `mvn verify` is green on it, but `JAVA_HOME` still points at JDK 24: set it to
+  `C:\Program Files\Java\jdk-25.0.5.0.3` for Maven.
+- Phases 3 to 9 are not started. There is no firmware yet. Nothing is deployed.
 
 ## Next step
 
-1. Step 0.1: initial commit on `main`, create `develop`, put the work on a feature branch, open a PR. (Needs the
-   person to ask for commits, see `AGENTS.md`.)
-2. Finish step 1.7 by checking it in a browser: start `docker compose up -d --wait`, the backend
-   (`PORT=8081 mvn -Djava.version=24 spring-boot:run -Dspring-boot.run.profiles=dev,demo`), json-server
-   (`npm run api` in `tarjepafi-webapp/webapp`) and `npm start`; set `apiBaseUrl` to `http://localhost:8081/api/v1`
-   if you keep 8081. Sign in as each demo user, reload the page (session restore + `auth/me`), and check that a
-   401 signs out. Then fix the e2e suite (see log) and commit the web app branch when the person asks.
-3. Then tick the Phase 1 Verify block (M1), then Phase 2 (needs the team's Azure subscription, R2).
+1. A person must: confirm the region (Central US proposed), create the Neon project, and push this branch so CI runs
+   (see "What a person must do" in `docs/DEPLOYMENT.md`). Then make the two GHCR packages public.
+2. Create the Azure resources in the order of `docs/DEPLOYMENT.md` (resource group, App Service plan and web app,
+   ACI broker), asking the person before each paid resource. Then run the phase 2 Verify block against the deployed
+   environment, tick 2.1 to 2.3 and 2.5, and fill the real names into `DEPLOYMENT.md`.
+3. Step 2.4 (web app production config, Static Web Apps, CORS) needs the web app repository: branch off
+   `feat/connection-tests`.
+4. If the cloud steps are blocked, phase 3 needs no cloud and can be done first (come back before phase 4 is verified).
 
 ## Checklist
 
 ### Phase 0 · Foundations
-- [ ] 0.1 Initial commit on `main`, `develop` created, work on `feature/project-scaffold`
+- [x] 0.1 Initial commit on `main`, `develop` created (done by the team, 2026-11-16; the scaffold went in as one commit, so there is no `feature/project-scaffold` branch)
 - [x] 0.2 Maven project (Spring Boot 4.1.x, Java 25)
 - [x] 0.3 Package skeleton per bounded context
 - [x] 0.4 `compose.yaml` (PostgreSQL, RabbitMQ + MQTT)
@@ -58,13 +58,13 @@ How to use this file:
 - [x] 1.4 `POST /auth/sign-in` (TS02)
 - [x] 1.5 JWT filter, `GET /auth/me` (TS03, TS04)
 - [x] 1.6 Role rules replace the `open-api` switch
-- [ ] 1.7 Web app `feature/backend-auth`
-- [ ] Verify block passed (milestone M1)
+- [x] 1.7 Web app `feature/backend-auth`
+- [x] Verify block passed (milestone M1, 2026-11-16)
 
 ### Phase 2 · Demo environment (first deployment)
-- [ ] 2.1 Dockerfile and CI
+- [ ] 2.1 Dockerfile and CI (Dockerfile verified locally; workflow not yet run on GitHub)
 - [ ] 2.2 Azure resources (App Service, PostgreSQL, broker)
-- [ ] 2.3 Broker users (`tarjepafi-backend`, restricted `reader-demo`)
+- [ ] 2.3 Broker users (`tarjepafi-backend`, restricted `reader-demo`) (verified locally on the image; not yet on ACI)
 - [ ] 2.4 Web app production config and CORS
 - [ ] 2.5 `docs/DEPLOYMENT.md`
 - [ ] Verify block passed
@@ -173,6 +173,49 @@ How to use this file:
   acceptance suite signs in through the UI, so it now needs the backend running and `apiBaseUrl` pointing at it
   (its `API` constant and `webServer` still target json-server on 3000): not run, not adapted yet. Docker Desktop
   was stopped and was started for the check; the backend process was stopped afterwards, compose is still up.
+- 2026-11-16 · Phase 1 closed. Browser check (Playwright, Chromium, real UI against the backend on 8080, json-server
+  on 3000, `ng serve` on 4200): 27 of 27 checks. The 5 enabled demo users land on their home (admin → dashboard,
+  both teachers → my sessions, student and staff → coming-soon); `jsalazar` (INACTIVE) and `soporte` (SUSPENDED)
+  show "Tu cuenta no está habilitada…", a wrong password shows "Correo o contraseña incorrectos.", `admin@gmail.com`
+  shows the e-mail message; the stored session holds the token and never the password; a reload keeps the session
+  and calls `GET auth/me` with a Bearer header; json-server calls carry no Authorization header and no other call
+  goes to the backend; a tampered token gets 401 from `auth/me`, the session is cleared and the app ends on
+  `/login?returnUrl=…`; a session in the old format (no token) is discarded; sign-out from the profile page works;
+  a teacher on `/admin/dashboard` is sent to `/access-denied`. The 24 Playwright **acceptance** scenarios
+  (`--project=acceptance --no-deps`) pass with sign-in going to the backend. `mvn verify` on JDK 25: 29 tests, 0
+  failures. The earlier curl checks (log of the same day) cover 403 for a teacher token on an admin route.
+- 2026-11-16 · Things the next person will trip over: (1) the Playwright `webServer` starts its own json-server on
+  port 3000 (`reuseExistingServer: false`), so stop `npm run api` before running the suite, and start the backend
+  first because the UI sign-in now goes to it; (2) the `integration` project describes the json-server contract and
+  is retired by the plan, so run `npx playwright test --project=acceptance --no-deps`; (3) the web app's Playwright
+  needs Chromium build 1255 (`npx playwright install chromium`); (4) `JAVA_HOME` points at JDK 24 while `java` on
+  `PATH` is 25: Maven uses `JAVA_HOME`, and classes compiled by one JDK do not load on the older one
+  (`UnsupportedClassVersionError`, class version 69 vs 68) — run `mvn clean` if `target/` was built by the other;
+  (5) port 8080 was free again, so the backend ran on its default and `environment.ts` needed no change; (6) after a
+  401 the app leaves the page by itself (it ends on `/login?returnUrl=…`), no extra redirect code was needed.
+- 2026-11-16 · Phase 2 decisions and local work (plan revision 3). Azure checks (read-only): the subscription is
+  Azure for Students with 11 unrelated resource groups (other coursework, not touched); `Microsoft.DBforPostgreSQL`,
+  `ContainerInstance`, `OperationalInsights` and `App` were not registered; 6 vCPU quota per region; PostgreSQL
+  provisioning is restricted in East US; small VMs are `NotAvailableForSubscription` in East US 2, Brazil South and
+  Mexico Central; Central US and Chile Central allow everything. Prices came from aggregator sites and were not
+  confirmed on Microsoft's page. TiDB was rejected (MySQL-compatible, the backend and tests are PostgreSQL).
+- 2026-11-16 · Broker image lessons (`docker/rabbitmq/`), all found by testing, none obvious: (1) `rabbitmq-diagnostics ping`
+  succeeds while the Erlang node is up but the broker app is not, so wait with `check_running`; (2) the official
+  entrypoint drops to the `rabbitmq` user, and a CLI run as root creates `.erlang.cookie` with the wrong owner and
+  the broker then dies with `eacces`, so run the CLI through `su-exec rabbitmq` and never before the node wrote the
+  cookie; (3) **topic permissions can only be set on an exchange that exists**, and the backend declares
+  `tarjepafi.devices`, so the script waits for it and creates the user only then (an earlier version created the
+  user first and left it with no topic restriction, which let it publish to any routing key); (4) management
+  statistics lag by several seconds, read queues with the `get` API when testing; (5) with `MSYS_NO_PATHCONV=1`
+  `-o /dev/null` breaks curl on Git Bash, and without it `-p /` is rewritten to a Windows path.
+  Verified with mosquitto clients: a tap on `tarjepafi/readers/<id>/tap` is routed to `tarjepafi.readers.<id>.tap`;
+  `other/topic` and `tarjepafi/admin/x` drop the connection and reach nothing; subscribing to `#` is denied; a wrong
+  password and an anonymous connection are refused; a broker message on `tarjepafi.readers.<id>.display` reaches the
+  subscribed reader.
+- 2026-11-16 · Backend image: `java -Djarmode=tools extract --layers` layers are merged into `/app`; the container
+  runs as a non-root user and `JAVA_TOOL_OPTIONS` sets `MaxRAMPercentage=70`. App Service needs `WEBSITES_PORT=8080`.
+  The `dev` profile must not be active in the cloud (it carries a default JWT secret); use `demo` plus `JWT_SECRET`.
+  Health checks RabbitMQ, so with the broker stopped the backend reports `DOWN`.
 - 2026-11-15 · Team decisions: web app base branch is `feat/connection-tests` (identical tree to
   `feat/sprint1-fase7-testing-suite`; `develop` reverted the test suite). `src/main/resources/seed/db.json` is
   byte-identical to that branch's `server/db.json`. The broker will be RabbitMQ on Azure (student credit).
