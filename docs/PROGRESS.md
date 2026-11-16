@@ -18,21 +18,24 @@ How to use this file:
 - **Phase 1 backend (steps 1.1 to 1.6) is written and verified**: `users` table, sign-in, JWT, `GET /auth/me`,
   admin and demo user seeders, problem-details error handler with `code`. `mvn -Djava.version=24 verify` runs 29
   tests green (12 of them hit the real API on Testcontainers).
-- Step 1.7 (web app sign-in adapter) is **not started**. Its base branch is decided: `feat/connection-tests`.
+- Step 1.7 (web app sign-in adapter) is **written** on local branch `feature/backend-auth` (off
+  `feat/connection-tests`, uncommitted): `ng build` and the 49 unit tests pass, and the backend side of the
+  contract was exercised with curl (see log). **Not yet checked in a browser**: nobody has signed in through the
+  Angular login screen against the backend, so 1.7 stays unticked.
 - Azure: the team has Azure for Students credit; no resource exists yet. Phase 2 lists what a person must do
   first (`az login`). If that is not done when you get there, do phase 3 and come back.
 - Phases 2 to 9 are not started. There is no firmware yet. Nothing is deployed.
 
 ## Next step
 
-1. Step 0.1: initial commit on `main`, create `develop`, put the work on a feature branch, open a PR.
-2. Step 1.7 in `tarjepafi-webapp`: `git checkout feat/connection-tests`, then branch `feature/backend-auth`, then
-   `environment.ts` (`apiBaseUrl` → backend, `legacyApiBaseUrl` → json-server), `UsersApiEndpoint.verifyCredentials`
-   → `POST auth/sign-in` (body `{ email, password }`, answer `{ token, user }`), token kept with the session in
-   `auth.store.ts`, `revalidate` → `GET auth/me`, bearer interceptor that signs out on 401. Error mapping: the
-   problem document's `code` is `INVALID_EMAIL` (400), `INVALID_CREDENTIALS` (401) or `ACCOUNT_DISABLED` (403).
-   Every other endpoint class must keep using `legacyApiBaseUrl` until its phase.
-3. Then the Phase 1 Verify block, then Phase 2 (needs the team's Azure subscription and the broker choice, R2).
+1. Step 0.1: initial commit on `main`, create `develop`, put the work on a feature branch, open a PR. (Needs the
+   person to ask for commits, see `AGENTS.md`.)
+2. Finish step 1.7 by checking it in a browser: start `docker compose up -d --wait`, the backend
+   (`PORT=8081 mvn -Djava.version=24 spring-boot:run -Dspring-boot.run.profiles=dev,demo`), json-server
+   (`npm run api` in `tarjepafi-webapp/webapp`) and `npm start`; set `apiBaseUrl` to `http://localhost:8081/api/v1`
+   if you keep 8081. Sign in as each demo user, reload the page (session restore + `auth/me`), and check that a
+   401 signs out. Then fix the e2e suite (see log) and commit the web app branch when the person asks.
+3. Then tick the Phase 1 Verify block (M1), then Phase 2 (needs the team's Azure subscription, R2).
 
 ## Checklist
 
@@ -152,6 +155,24 @@ How to use this file:
 - 2026-11-15 · `shared` must not import from a context: the bearer filter depends on the `TokenAuthenticator`
   port in `shared/application/security`, which IAM implements. New routes get their role rule in
   `SecurityConfiguration`. Demo seeders are one per context, reading their collections through `DemoSeed`.
+- 2026-11-16 · Step 1.7 written in `tarjepafi-webapp/webapp` (branch `feature/backend-auth`, nothing committed).
+  `environment.ts` has `apiBaseUrl` (`http://localhost:8080/api/v1`) and `legacyApiBaseUrl` (json-server);
+  `BaseApiEndpoint` and `CampusSettingsApi` use the legacy one, so only `UsersApiEndpoint.signIn/me` hit the
+  backend. `AuthStore` stores `{ token, user }` under `tp.session` (an old session without token is discarded on
+  restore), exposes `token`, maps the problem `code` (fallback to HTTP status), and revalidates with `auth/me`.
+  `iam/infrastructure/bearer-token.interceptor.ts` only touches URLs under `apiBaseUrl`, skips sign-in, and calls
+  `signOut()` on 401. `UsersApiEndpoint` still extends `BaseApiEndpoint` (legacy `users` collection) though nothing
+  else calls it; drop that inheritance when json-server goes.
+- 2026-11-16 · Verified against the running backend (curl, port 8081, `dev,demo`): the 7 demo users (admin,
+  docente, student, staff, second teacher → 200; `jsalazar` INACTIVE and `soporte` SUSPENDED → 403
+  `ACCOUNT_DISABLED`), wrong password → 401 `INVALID_CREDENTIALS`, `foo@gmail.com` → 400 `INVALID_EMAIL`,
+  `GET auth/me` 200 with token and 401 without, teacher token on `PUT simulation/clock` → 403, CORS preflight for
+  `http://localhost:4200` allows `authorization`. `ng build` and `ng test` (49 tests) green.
+- 2026-11-16 · Web app findings: `package-lock.json` on `feat/connection-tests` is out of sync (`npm ci` fails on
+  missing `@emnapi/*`); installed with `npm install --no-package-lock`, lockfile untouched. The Playwright
+  acceptance suite signs in through the UI, so it now needs the backend running and `apiBaseUrl` pointing at it
+  (its `API` constant and `webServer` still target json-server on 3000): not run, not adapted yet. Docker Desktop
+  was stopped and was started for the check; the backend process was stopped afterwards, compose is still up.
 - 2026-11-15 · Team decisions: web app base branch is `feat/connection-tests` (identical tree to
   `feat/sprint1-fase7-testing-suite`; `develop` reverted the test suite). `src/main/resources/seed/db.json` is
   byte-identical to that branch's `server/db.json`. The broker will be RabbitMQ on Azure (student credit).
