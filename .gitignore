@@ -1,0 +1,10 @@
+target/
+.env
+*.log
+.idea/
+*.iml
+.vscode/
+.DS_Store
+# Firmware: real network and broker credentials stay local
+firmware/**/include/config.h
+firmware/**/.pio/

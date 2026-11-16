@@ -1,0 +1,76 @@
+spring:
+  application:
+    name: tarjepafi-backend
+  profiles:
+    default: dev
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/tarjepafi}
+    username: ${DB_USERNAME:tarjepafi}
+    password: ${DB_PASSWORD:tarjepafi}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:tarjepafi}
+    password: ${RABBITMQ_PASSWORD:tarjepafi}
+    virtual-host: ${RABBITMQ_VHOST:/}
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+tarjepafi:
+  clock:
+    zone: America/Lima
+    mode: ${CLOCK_MODE:system}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  security:
+    jwt:
+      # At least 32 bytes. No default outside the dev profile: a deployment must set JWT_SECRET.
+      secret: ${JWT_SECRET:}
+      expiration: ${JWT_EXPIRATION:8h}
+  admin:
+    # TS01: first administrator, created at start-up when both values are set.
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
+    full-name: ${ADMIN_FULL_NAME:Administrator}
+
+---
+# Local development only.
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+tarjepafi:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:local-development-secret-not-for-deployment-0123456789}
+
+---
+# Demo: simulated clock aligned with the web app (environment.initialSimulatedTime) and its seed data.
+spring:
+  config:
+    activate:
+      on-profile: demo
+
+tarjepafi:
+  clock:
+    mode: simulated
+    initial: 2026-10-07T09:50:00
+    ticking: false
