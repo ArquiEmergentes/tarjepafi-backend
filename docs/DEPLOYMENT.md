@@ -23,13 +23,14 @@ showcase (about 24 hours) and then **everything is deleted** (see "Teardown").
 | Images | GitHub Container Registry, **public** packages | Free, no pull credentials. They contain no secrets, but they do contain the demo seed (`db.json` with the documented demo passwords). |
 | Web app | Azure Static Web Apps, free plan | Decided in phase 2 step 4. |
 
-Region: **Central US** is proposed (all of App Service B1, ACI and small VMs were available to the subscription there on
-2026-11-16; PostgreSQL provisioning is restricted in East US, which is not used). Confirm before creating anything.
+Region: **Chile Central** (`chilecentral`), chosen by the team on 2026-11-16. App Service B1 and ACI list it as available;
+the subscription's quota there is still to be confirmed when the resources are created. The database is Neon, so the
+restriction on PostgreSQL in East US does not matter.
 Resource group: `rg-tarjepafi-demo`. Tag it `purpose=showcase` and `delete-after=<date>`.
 
 ## What a person must do (an agent cannot)
 
-1. **Neon**: create an account and a project (any region near Central US, PostgreSQL 17), copy the direct connection
+1. **Neon**: create an account and a project (closest region offered, PostgreSQL 17; already created by the team), copy the direct connection
    string. Do not paste it in the repository or in chat; it goes to the App Service settings.
 2. **GitHub**: after the first `ci` run on `develop`, open the two packages (`tarjepafi-backend`, `tarjepafi-rabbitmq`)
    under the organisation's Packages, link them to the repository and set the visibility to **public**.
@@ -42,7 +43,7 @@ Resource group: `rg-tarjepafi-demo`. Tag it `purpose=showcase` and `delete-after
 Pick a short unique `SUFFIX` (lower case letters and digits). Generate every password with a password manager.
 
 ```bash
-RG=rg-tarjepafi-demo; LOC=centralus; SUFFIX=<suffix>
+RG=rg-tarjepafi-demo; LOC=chilecentral; SUFFIX=<suffix>
 az provider register -n Microsoft.ContainerInstance        # free, once per subscription
 az group create -n $RG -l $LOC --tags purpose=showcase delete-after=<yyyy-mm-dd>
 

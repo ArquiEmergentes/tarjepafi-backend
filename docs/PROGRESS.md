@@ -19,7 +19,10 @@ How to use this file:
   Hikari settings for a serverless database, `mvn verify` (29 tests) on JDK 25. Written but **not run anywhere**:
   `.github/workflows/ci.yml` (YAML parses, never executed on GitHub) and the commands in `docs/DEPLOYMENT.md`.
 - Azure: logged in (`az login`, Azure for Students, 2026-11-16); no resource created; `Microsoft.ContainerInstance`
-  is not registered yet. Region proposed: Central US (not yet confirmed by the team).
+  is not registered yet. Region: Chile Central (decided 2026-11-16); the Neon project exists; the web app goes on Azure Static Web Apps.
+  ACI lists Chile Central; the GHCR packages are public (anonymous pull 200).
+  Verified locally on 2026-11-16: the published images against the real Neon project (Flyway 2 migrations, health UP,
+  sign-in 200/401, sign-in after >5 min idle 1.2 s). Still undeployed on Azure.
 - Git: `main` and `develop` exist. The web app's step 1.7 is commit `6b6add6` on `feat/sprint1-fase7-testing-suite`
   (pushed); the local branch `feature/backend-auth` points at it.
 - Build: JDK 25 is installed and `mvn verify` is green on it, but `JAVA_HOME` still points at JDK 24: set it to
@@ -28,8 +31,8 @@ How to use this file:
 
 ## Next step
 
-1. A person must: confirm the region (Central US proposed), create the Neon project, and push this branch so CI runs
-   (see "What a person must do" in `docs/DEPLOYMENT.md`). Then make the two GHCR packages public.
+1. A person must: make the two GHCR packages public (CI already ran green on GitHub; see "What a person must do" in
+   `docs/DEPLOYMENT.md`). Region and Neon are settled.
 2. Create the Azure resources in the order of `docs/DEPLOYMENT.md` (resource group, App Service plan and web app,
    ACI broker), asking the person before each paid resource. Then run the phase 2 Verify block against the deployed
    environment, tick 2.1 to 2.3 and 2.5, and fill the real names into `DEPLOYMENT.md`.
