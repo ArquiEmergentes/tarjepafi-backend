@@ -41,7 +41,7 @@ How to use this file:
 
 ## Next step
 
-1. Phase 5 is implemented and tested locally on `feature/phase5-tap-resolution` (uncommitted): commit, PR, CI image,
+1. Phase 5 is deployed and verified (PR #8). Next: Phase 6 (Wokwi firmware), see the plan. Old text: (commit, PR, CI image,
    restart the App Service app, then run `docs/http/demo.http` and the other two `.http` files against the deployed API
    and tick the Verify block (milestone M2). Truncate the context tables on Neon afterwards (`sessions`,
    `session_participants`, `attendance_records`, `access_records`, `work_shifts`, plus the IoT ones) and restart to reseed.
@@ -110,7 +110,7 @@ How to use this file:
 - [x] 5.4 Space & Facility: `V8` (access records, work shifts, `@Version` on spaces), `SpaceCardTapEventConsumer` (TS22 without reservations), `AccessControlService`, TS18, TS19, TS28, TS30 and the access-record / work-shift reads
 - [x] 5.5 Fallback resolver removed
 - [x] 5.6 Contract written (`docs/API.md`, `docs/http/attendance.http`, `space-facility.http`, `demo.http`); **not frozen until the Verify block passes on the deployed API**
-- [ ] Verify block passed (milestone M2). Local: `TapResolutionApiTests` (6) replay the demo walkthrough and acceptance 01 to 04 and 07 against real PostgreSQL and RabbitMQ, 132 tests green; still to run on the deployed API through `demo.http`
+- [x] Verify block passed (milestone M2, 2026-11-24, deployed: 17 checks of the demo walkthrough through the API, 16 passed and the 17th was the script tapping a reader the clock jump had made OFFLINE, which is the documented behaviour). Local: `TapResolutionApiTests` (6) replay the demo walkthrough and acceptance 01 to 04 and 07 against real PostgreSQL and RabbitMQ, 132 tests green; still to run on the deployed API through `demo.http`
 
 ### Phase 6 · Wokwi firmware and the live showcase
 - [ ] 6.1 Project files and circuit
@@ -310,3 +310,5 @@ How to use this file:
   demo works for those days. TS19 occupancy counts only the campus (people who entered today and have not left), other
   spaces answer `tracked: false`; TS30 presences are derived from granted campus entry/exit access records (no separate
   `CampusPresence` table). `jsalazar@upc.edu.pe` is INACTIVE in the seed, so the third teacher cannot sign in.
+- 2026-11-24 · Phase 5 deployed and verified. Image of `develop` at `3ed7451`, app stopped and started, Flyway ran `V7`/`V8`. The demo walkthrough gave the old web app outcomes (exit "1 h 30 min", counts absent 17 / justified 1 / late 1 / present 1, shift closed "8 h 03 min trabajadas", denied access record). Things seen: on the deployed stack a tap that writes records can take more than the 3 s the simulated-tap endpoint waits, so it answers `202` with the event `PENDING`; poll `GET /iot/tap-events/{id}` (it resolves within a few seconds). A clock jump with no heartbeats makes readers OFFLINE (30 s monitor), after which taps there are `tap.readerOutOfService`: move the clock back or restart to reseed. The broker still had the durable `iot.fallback.card-tap.queue` of phase 4 collecting messages; it was deleted by hand. Neon was truncated (context tables) and the app restarted to reseed.
+
