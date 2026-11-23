@@ -16,7 +16,9 @@ verified on the deployed API (plan D14): later changes are additive, or announce
 The demo environment is temporary: it is stopped between work sessions (the first request after a stop can take about a
 minute) and deleted after the showcase. The first request after the database sat idle can add a second or two.
 
-CORS: the browser origins listed in the `CORS_ALLOWED_ORIGINS` setting are accepted (today `http://localhost:4200`).
+**Frontend dev server port: run it on `4781`** (`http://localhost:4781`, e.g. `ng serve --port 4781`). That origin is allowed by CORS,
+locally and on the deployed demo (`http://localhost:4200` is still accepted but do not rely on it). The browser origins listed in the
+`CORS_ALLOWED_ORIGINS` setting are accepted.
 Tell the backend owner your dev and deployed origins.
 
 ## Conventions

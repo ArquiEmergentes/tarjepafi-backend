@@ -2,7 +2,7 @@
 ### Pick the environment, then run the requests in order.
 @host = https://tarjepafi-api-pafi7k2.azurewebsites.net
 # @host = http://localhost:8080
-@origin = http://localhost:4200
+@origin = http://localhost:4781
 
 ### 1. Health (expect {"status":"UP",...})
 GET {{host}}/actuator/health
