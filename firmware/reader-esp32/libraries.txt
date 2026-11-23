@@ -1,0 +1,5 @@
+# Arduino Library Manager names, installed by wokwi.com
+MFRC522
+LiquidCrystal I2C
+MQTT
+ArduinoJson

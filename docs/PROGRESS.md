@@ -36,15 +36,19 @@ How to use this file:
   What it contains: `V6`, reader management,
   the MQTT ingestion pipeline (`DeviceEventConsumer`, idempotent, DLQ), heartbeats, offline detection, incidents, the
   tap-resolved consumer with the display reply, the temporary fallback resolver, polling endpoints and simulated taps.
-  116 tests green on JDK 25. `docs/API.md` has the IoT section and `docs/http/iot.http` exists. Phases 5 to 9 are not
-  started; there is no firmware yet.
+  116 tests green on JDK 25. `docs/API.md` has the IoT section and `docs/http/iot.http` exists.
+- **Phase 5 is deployed and verified (2026-11-24)**, PR #8.
+- **Phase 6 started (2026-11-24)** on `feature/wokwi-reader-firmware`, uncommitted: `firmware/reader-esp32/` holds
+  steps 6.1 to 6.5 written but **not compiled or run yet** (no PlatformIO or Arduino CLI on this machine).
+  `firmware/mqtt-smoke-test/` is the minimal sketch that proved Wokwi reaches the ACI broker as `reader-demo` with a
+  `Heartbeat` (after the `reader-demo` password was reset). `.gitignore` now also ignores a flat `firmware/**/config.h`.
 
 ## Next step
 
-1. Phase 5 is deployed and verified (PR #8). Next: Phase 6 (Wokwi firmware), see the plan. Old text: (commit, PR, CI image,
-   restart the App Service app, then run `docs/http/demo.http` and the other two `.http` files against the deployed API
-   and tick the Verify block (milestone M2). Truncate the context tables on Neon afterwards (`sessions`,
-   `session_participants`, `attendance_records`, `access_records`, `work_shifts`, plus the IoT ones) and restart to reseed.
+1. Phase 6: load `firmware/reader-esp32/` into a wokwi.com ESP32 project (README), fix whatever does not compile, then
+   check 6.2 to 6.5 there (tap round trip, timeout, offline switch, flush in order) and tick them. Then 6.6: the seed
+   overlay with the Wokwi card UIDs (plan section 6) and the backend storing/exposing `buffered` (gap in plan section 4),
+   redeploy.
 2. Hand the frontend owner the deployed URL, Swagger UI and `docs/API.md` (plan section 8) and ask for their origins
    (`CORS_ALLOWED_ORIGINS`); today only `http://localhost:4200` is allowed. IAM, credentials and IoT are frozen.
 3. Small debts: Swagger request/response examples for IAM, credentials and IoT (D14).
@@ -311,4 +315,15 @@ How to use this file:
   spaces answer `tracked: false`; TS30 presences are derived from granted campus entry/exit access records (no separate
   `CampusPresence` table). `jsalazar@upc.edu.pe` is INACTIVE in the seed, so the third teacher cannot sign in.
 - 2026-11-24 · Phase 5 deployed and verified. Image of `develop` at `3ed7451`, app stopped and started, Flyway ran `V7`/`V8`. The demo walkthrough gave the old web app outcomes (exit "1 h 30 min", counts absent 17 / justified 1 / late 1 / present 1, shift closed "8 h 03 min trabajadas", denied access record). Things seen: on the deployed stack a tap that writes records can take more than the 3 s the simulated-tap endpoint waits, so it answers `202` with the event `PENDING`; poll `GET /iot/tap-events/{id}` (it resolves within a few seconds). A clock jump with no heartbeats makes readers OFFLINE (30 s monitor), after which taps there are `tap.readerOutOfService`: move the clock back or restart to reseed. The broker still had the durable `iot.fallback.card-tap.queue` of phase 4 collecting messages; it was deleted by hand. Neon was truncated (context tables) and the app restarted to reseed.
+- 2026-11-24 · Phase 6 groundwork. A minimal Wokwi sketch (`firmware/mqtt-smoke-test/`) reached the ACI broker over plain
+  MQTT 1883 and published a `Heartbeat`. Lessons: (1) the ACI broker answered CONNACK after about 3 s (measured with a
+  raw CONNECT from a laptop, bad credentials), and the `MQTT` library (256dpi) waits only 1 s by default, which shows as
+  `lastError=-9 returnCode=6`: the firmware sets a 10 s timeout; (2) `returnCode=4` was a wrong `reader-demo` password,
+  fixed by resetting it; the generated secrets file is not on every dev machine. Firmware decisions: library `MQTT`
+  (256dpi) because `PubSubClient` cannot publish with QoS 1; ArduinoJson 7; the network module is `ReaderNetwork`
+  because ESP32 Arduino core 3 already has a `NetworkManager` class; heartbeat 60 s and telemetry 30 s from the seed
+  configuration of RDR-A-301; heartbeat + telemetry are sent before the buffer flush so the reader is ACTIVE again
+  first; a reply up to 15 s late is still shown because the deployed backend can take more than 3 s; the MQTT client id
+  gets a random suffix (Wokwi gives every ESP32 the same MAC). The backend ignores `buffered` (not stored, not exposed),
+  so demo step 6 needs a small backend change.
 

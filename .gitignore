@@ -7,4 +7,5 @@ target/
 .DS_Store
 # Firmware: real network and broker credentials stay local
 firmware/**/include/config.h
+firmware/**/config.h
 firmware/**/.pio/
