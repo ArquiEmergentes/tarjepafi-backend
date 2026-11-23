@@ -26,22 +26,20 @@ How to use this file:
   Phase 3 is on `feature/credentials-catalogues`, uncommitted.
 - Build: JDK 25 is installed and `mvn verify` is green on it, but `JAVA_HOME` may still point at JDK 24: set it to
   `C:\Program Files\Java\jdk-25.0.5.0.3` for Maven.
-- **Phase 3 is implemented and tested locally, not deployed**: 70 tests green on JDK 25 (`mvn verify`, Docker needed).
-  Migrations `V3` to `V5`, the credentials, space and catalogue endpoints, the `CardHolderDirectoryPort`, integration events
-  after commit and the three exchanges declared by the backend (this also makes the broker create the reader user by itself).
-  `docs/API.md` has the credentials section and `docs/http/credentials.http` exists. Phases 4 to 9 are not started;
-  there is no firmware yet.
+- **Phase 3 is deployed and verified (2026-11-23)**, PR #4 merged, image built by CI, backend restarted on Azure. Credentials,
+  card holders, permissions, enrollment verification, settings and the catalogues work on
+  `https://tarjepafi-api-pafi7k2.azurewebsites.net`; `docs/API.md` is frozen for them. The backend declares the exchanges,
+  so the broker creates `reader-demo` by itself (checked by restarting the ACI container, then the MQTT permission
+  checks again). Phases 4 to 9 are not started; there is no firmware yet.
 
 ## Next step
 
-1. Phase 3: commit, open the PR to `develop` (the person decides), merge, let CI publish the image, restart the App
-   Service app (`az webapp restart`), then run `docs/http/credentials.http` against the deployed API and tick 3.6 and
-   the Verify block. Freeze the credentials section of `docs/API.md` afterwards. The new tables are created by Flyway
-   on start; the demo seeder imports the cards on the first start. After the restart check the reader user exists
-   without the manual exchange step (the log line `reader user 'reader-demo' ready` on the broker).
+1. Phase 4 (IoT: readers, messaging backbone, ingestion), first step 4.1 (queues, bindings and dead letter queues of plan
+   section 4). Branch off `develop`.
 2. Hand the frontend owner the deployed URL, Swagger UI and `docs/API.md` (plan section 8) and ask for their origins
-   (`CORS_ALLOWED_ORIGINS`).
-3. Phase 4 (IoT: readers, messaging backbone, ingestion).
+   (`CORS_ALLOWED_ORIGINS`); today only `http://localhost:4200` is allowed.
+3. Small debts: Swagger request/response examples for IAM and credentials (D14), and `az` needs a fresh login when it
+   asks (tokens expire after 90 days idle).
 
 ## Checklist
 
@@ -82,8 +80,8 @@ How to use this file:
 - [x] 3.3 Endpoints (US10, US11, US13, US14, US15): 30 API tests against PostgreSQL and RabbitMQ containers
 - [x] 3.4 `CardHolderDirectoryPort` (TS29), events (`tarjepafi.events` after commit, 2 messaging tests; the backend now declares the three exchanges)
 - [x] 3.5 Catalogue read endpoints (spaces, courses, schedules, enrollments)
-- [ ] 3.6 Contract: Swagger, `docs/API.md`, `docs/http/credentials.http`; frozen after Verify
-- [ ] Verify block passed
+- [x] 3.6 Contract: Swagger, `docs/API.md`, `docs/http/credentials.http`; frozen after Verify (Swagger has the error codes in each description; request/response examples are still to add)
+- [x] Verify block passed (2026-11-23, deployed API: 34 of 34 requests of `credentials.http` gave the documented status, values checked afterwards)
 
 ### Phase 4 · IoT: readers, messaging backbone, ingestion
 - [ ] 4.1 RabbitMQ topology
@@ -258,3 +256,12 @@ How to use this file:
   verification.enabled=false` turns it off). Lessons: RabbitMQ 4 refuses transient non-exclusive queues (use exclusive
   ones in tests); a null `String` parameter inside `lower(concat(...))` makes PostgreSQL type it as `bytea`, so search
   patterns are built in Java; `Map.of` throws on `get(null)`. The old web app's `settings` is one object in `db.json`.
+- 2026-11-23 · Phase 3 deployed and verified. Restarted the App Service app after CI published the image (`develop`
+  at `690a11e`): Flyway created `V3` to `V5` on Neon and the demo seed imported 52 holders, 55 cards, 7 history rows,
+  2 permissions, 15 spaces, 6 courses, 12 schedules and 240 enrollments. Ran `credentials.http` with curl: every
+  status as documented (one run changes the data, so afterwards the card tables were truncated in Neon and the app
+  restarted, which restored the seed). US15 deactivated the 5 active cards of students with a pending enrollment as
+  `SYSTEM` with reason `ENROLLMENT_NOT_COMPLETED`, and a second run found nothing. The broker was restarted: the
+  reader user was created without help once the backend reconnected, and the MQTT checks (publish tap, receive display,
+  `#` denied, other topic refused, wrong password refused) passed again. A script bug is worth remembering: Git Bash
+  `/tmp` is not the path Windows Python sees, so write response files under the scratchpad or parse in Python.
