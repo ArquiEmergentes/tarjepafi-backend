@@ -77,6 +77,100 @@ The campus clock the rules read. `GET` returns `{ "now": "2026-10-07T09:50:00", 
 `{ "now": "…" }` moves it and needs the `ADMIN` role; it answers `409` when the clock follows real time. The demo
 environment runs the simulated clock, starting at `2026-10-07T09:50:00` and not ticking.
 
+## Credentials (phase 3)
+
+Cards (`credentials`), the people they belong to (`card-holders`), the campus `settings`, and the catalogues the
+screens need (`spaces`, `courses`, `class-schedules`, `enrollments`). Field names follow the old web app's
+`*.resource.ts`. **Every `/credentials` and `/card-holders` route needs the `ADMIN` role** (a teacher gets `403`);
+`/settings` and the catalogues accept any signed-in user. Lists are not paged (at most a few hundred rows).
+
+### Card holders
+
+`CardHolder`: `{ id, code, fullName, email, role, program, enrollmentStatus }` with `role` one of `STUDENT`,
+`TEACHER`, `STAFF`, and `enrollmentStatus` `COMPLETED` or `PENDING` (null unless the holder is a student).
+
+| Route | Notes |
+|---|---|
+| `GET /card-holders` | Filters `role`, `q` (text in name or code), `code` (exact, ignoring case: answers a list with 0 or 1 holder). Ordered by name. |
+| `GET /card-holders/{id}` | `404 HOLDER_NOT_FOUND`. |
+
+### Cards
+
+`Credential`: `{ id, cardUid, cardHolderId, status, issuedAt, statusChangedAt, lastUsedAt, availableActions, holder }`.
+`status`: `ACTIVE`, `BLOCKED`, `LOST`, `DEACTIVATED`. `cardHolderId` and `holder` (a `CardHolder`) are `null` while
+the card is in stock. `availableActions` is what the current status allows, from `BLOCK`, `REPORT_LOST`, `DEACTIVATE`,
+`REACTIVATE`: use it to enable or disable your buttons. `cardUid` looks like `04:3D:9B:12:8F`.
+
+State machine: `BLOCK` and `REPORT_LOST` need `ACTIVE`; `DEACTIVATE` needs `ACTIVE`, `BLOCKED` or `LOST`; `REACTIVATE`
+needs `BLOCKED`, `LOST` or `DEACTIVATED`. A holder may have only one `ACTIVE` card.
+
+| Route | Story | Notes |
+|---|---|---|
+| `GET /credentials` | | Newest first, each with its `holder`. Filters `status`, `cardHolderId`, `q` (text in UID, holder name or code). |
+| `GET /credentials/{id}` | | `404 CREDENTIAL_NOT_FOUND`. |
+| `GET /credentials/{id}/history` | | Newest first: `{ id, credentialId, fromStatus, toStatus, reason, changedBy, changedAt, note }`. `reason`: `WITHDRAWAL`, `REENROLLMENT`, `ENROLLMENT_NOT_COMPLETED`, `LOST`, `MANUAL`. `changedBy` is a user id or `SYSTEM`. Linking a holder adds an entry whose `fromStatus` equals `toStatus`. |
+| `POST /credentials/{id}/block` | US10 | Body `{ "note": "..." }`, **required**: `400 NOTE_REQUIRED`. |
+| `POST /credentials/{id}/report-lost` | US10 | Optional body `{ "note" }`. History reason `LOST`. |
+| `POST /credentials/{id}/deactivate` | US10 | Optional body `{ "note" }`. |
+| `POST /credentials/{id}/reactivate` | US13 | Optional body `{ "note" }`. History reason `REENROLLMENT` when a student's `DEACTIVATED` card comes back, else `MANUAL`. |
+| `POST /credentials/{id}/link-holder` | US11 | Body `{ "holderCode": "U202312966" }` (ignores case). Links a stock card or moves it to another holder. |
+
+The five `POST` actions answer `200` with the updated `Credential`. Errors:
+
+| Status | `code` | When |
+|---|---|---|
+| 400 | `NOTE_REQUIRED` | `block` without a note. |
+| 400 | `VALIDATION_FAILED` | `link-holder` without `holderCode`. |
+| 404 | `CREDENTIAL_NOT_FOUND`, `HOLDER_NOT_FOUND` | Unknown id or holder code. |
+| 409 | `ACTION_NOT_ALLOWED` | The status does not allow the action. |
+| 409 | `HOLDER_HAS_ACTIVE_CARD` | `reactivate`, or `link-holder` of an active card, would give the holder a second active card. |
+| 409 | `ALREADY_LINKED` | `link-holder` to the holder the card already has. |
+| 422 | `ENROLLMENT_NOT_COMPLETED` | `reactivate` for a student whose enrollment is `PENDING`. |
+
+### Permission exceptions (US14)
+
+A card can have its own rule for a space; it beats the roles the space admits (`allowedRoles`).
+`Permission`: `{ id, credentialId, spaceId, effect }`, `effect` `ALLOW` or `DENY`.
+
+| Route | Notes |
+|---|---|
+| `GET /credentials/{id}/permissions` | Ordered by `spaceId`. |
+| `PUT /credentials/{id}/permissions/{spaceId}` | Body `{ "effect": "ALLOW" }`. Creates or replaces the exception; `404 SPACE_NOT_FOUND`; `400 VALIDATION_FAILED` for a missing or unknown `effect`. |
+| `DELETE /credentials/{id}/permissions/{spaceId}` | `204`; `404 PERMISSION_NOT_FOUND` when the card has none for that space. |
+
+### Enrollment verification (US15)
+
+After `settings.enrollmentDeadline` (read from the campus clock, so the simulated clock applies), the **active** cards
+of **students** whose enrollment is `PENDING` are deactivated by user `SYSTEM` with reason `ENROLLMENT_NOT_COMPLETED`.
+Before the deadline nothing changes. The backend also runs it daily at 00:05 campus time.
+
+| Route | Notes |
+|---|---|
+| `GET /credentials/enrollment-verification/preview` | Changes nothing. |
+| `POST /credentials/enrollment-verification` | Runs it now. Calling it again finds nothing left to do. |
+
+Both answer `{ executedAt, deadline, deadlinePassed, deactivated: [Credential], unchangedCount, failedCount }`.
+`deactivated` lists the cards a run would deactivate (preview) or did deactivate (run).
+
+### Settings
+
+`GET /settings` → `{ term: "2026-2", enrollmentDeadline: "2026-10-03T23:59:59", defaultToleranceMinutes: 10 }`.
+
+### Catalogues (read only, any signed-in user)
+
+| Route | Fields and filters |
+|---|---|
+| `GET /spaces`, `GET /spaces/{id}` | `{ id, code, name, type, building, floor, capacity, status, accessPolicy, allowedRoles }`. Filter `type` (`CLASSROOM`, `LABORATORY`, `RESTRICTED_AREA`, `CAMPUS_ENTRANCE`, `CAMPUS_EXIT`, `MEETING_ROOM`, `LIBRARY`, `STUDY_CUBICLE`). `status`: `AVAILABLE` or `MAINTENANCE`; `accessPolicy`: `OPEN` or `RESTRICTED`; `allowedRoles` from `STUDENT`, `TEACHER`, `STAFF`. `404 SPACE_NOT_FOUND`. |
+| `GET /courses` | `{ id, code, name, subject }`, ordered by code. |
+| `GET /class-schedules` | `{ id, courseId, section, teacherId, spaceId, dayOfWeek, startTime, endTime, term }`; `dayOfWeek` 1 = Monday to 7 = Sunday, times `HH:mm`; `teacherId` is a card holder id. Filters `teacherId`, `spaceId`, `term`. |
+| `GET /enrollments` | `{ id, studentId, scheduleId, term, status }`, `status` `ACTIVE` or `WITHDRAWN`; `studentId` is a card holder id. Filters `studentId`, `scheduleId`, `term`, `status`. |
+
+### Events (for information)
+
+Every change above is also published to the `tarjepafi.events` exchange after it commits
+(`credentials.credential-status-changed`, `credentials.holder-linked`, `credentials.permission-set`,
+`credentials.permission-removed`). The frontend does not consume them; the data management context will.
+
 ## Demo accounts (profile `demo`)
 
 | E-mail | Password | Role | Status |
@@ -96,3 +190,4 @@ Request examples that run against any environment: `docs/http/iam.http`.
 ## Changelog
 
 - 2026-11-23 · First version: IAM and the simulated clock.
+- 2026-11-23 · Credentials section (cards, card holders, permissions, enrollment verification, settings, catalogues). Not frozen until verified on the deployed API.
