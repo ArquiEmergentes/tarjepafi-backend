@@ -167,6 +167,14 @@ Reader → broker, topic `…/telemetry` (also counts as heartbeat) every `heart
   "signalStrength": -48, "uptime": 1234, "firmwareVersion": "2.4.1", "bufferedCount": 0 }
 ```
 
+Two more messages exist since phase 4 (the plan only listed `tap` and `telemetry`), both Reader → broker:
+`…/heartbeat` `{ "v": 1, "type": "Heartbeat", "readerId": "RDR-A-301", "sentAt": "2026-11-15T15:04:30Z" }` (a
+reader that has nothing to report may send only this) and `…/error` `{ "v": 1, "type": "ReaderError", "readerId":
+"RDR-A-301", "code": "HARDWARE_FAILURE", "message": "PN532 not found", "occurredAt": "…Z" }` where `code` is an incident
+type (`CONNECTIVITY_FAILURE`, `READ_ERROR`, `DEVICE_OFFLINE`, `CONFIGURATION_ERROR`, `HARDWARE_FAILURE`). The `tap`
+payload accepts an optional `"source": "SIMULATOR"` (the API's simulated taps use it; readers omit it). The `readerId`
+of the payload must equal the one in the topic, and every payload needs `"v": 1`.
+
 Broker → reader, topic `tarjepafi/readers/{readerId}/display`:
 
 ```json

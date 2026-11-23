@@ -171,6 +171,97 @@ Every change above is also published to the `tarjepafi.events` exchange after it
 (`credentials.credential-status-changed`, `credentials.holder-linked`, `credentials.permission-set`,
 `credentials.permission-removed`). The frontend does not consume them; the data management context will.
 
+## IoT readers (phase 4)
+
+The NFC readers, their health, their incidents and every card tap. **Every `/iot/**` route needs the `ADMIN` role.**
+Field names follow the old web app's `iot.resources.ts`. Times are campus local date-times.
+
+### Readers
+
+`Reader`: `{ id, name, deviceType, spaceId, status, configuration, registeredAt, lastSeenAt, availableActions }`.
+`id` looks like `RDR-A-301`. `deviceType`: `CLASSROOM_READER`, `TURNSTILE`, `DOOR_READER`, `DESK_READER`.
+`status`: `REGISTERED`, `ACTIVE`, `DEGRADED`, `OFFLINE`, `INACTIVE`, `MAINTENANCE`; only `ACTIVE` and `DEGRADED` process
+taps. `configuration`: `{ readerMode: ATTENDANCE | ACCESS_CONTROL, communicationInterval, heartbeatInterval (seconds),
+firmwareVersion: "2.4.1" }`. `lastSeenAt` is null until the reader is first seen. `availableActions` from `ACTIVATE`,
+`DEACTIVATE`, `START_MAINTENANCE`, `END_MAINTENANCE`.
+
+| Route | Story | Notes |
+|---|---|---|
+| `GET /iot/readers` | | Ordered by id. Filters `status`, `spaceId`. |
+| `GET /iot/readers/{id}` | | `{ reader, telemetry, incidents, recentTaps }`: last 20 samples and last 20 taps, newest first, all incidents. `404 READER_NOT_FOUND`. |
+| `POST /iot/readers` | TS05 | `201`. Body `{ id, name, deviceType, spaceId, configuration }`. Starts `REGISTERED`. |
+| `PUT /iot/readers/{id}/configuration` | TS06 | Body = `configuration`. Invalid data changes nothing. |
+| `POST /iot/readers/{id}/activate` | TS07 | From `REGISTERED` or `INACTIVE`; `lastSeenAt` becomes now. |
+| `POST /iot/readers/{id}/deactivate` | TS08 | From `ACTIVE`, `DEGRADED` or `OFFLINE`. |
+| `POST /iot/readers/{id}/start-maintenance`, `.../end-maintenance` | TS09 | Maintenance can start from any status but `MAINTENANCE`; ending it makes the reader `ACTIVE`. |
+| `GET /iot/readers/{id}/telemetry` | | Newest first. `limit` (default 50, at most 500). |
+| `GET /iot/readers/{id}/incidents` | | Newest first. `open=true` unresolved only, `open=false` resolved only. |
+| `GET /iot/readers/{id}/tap-events` | | Polling, see below. |
+| `POST /iot/readers/{id}/taps` | | Taps a card as the simulator would, see below. |
+
+`Telemetry`: `{ id, readerId, capturedAt, signalStrength (dBm, closer to 0 is better), uptime (seconds), firmwareVersion,
+status }`. A weak signal (below -75 dBm) turns an `ACTIVE` reader `DEGRADED`; a good one turns it back.
+
+Errors of `POST /iot/readers` and `PUT .../configuration`:
+
+| Status | `code` | When |
+|---|---|---|
+| 400 | `READER_ID_INVALID` | The id does not look like `RDR-A-301`. |
+| 400 | `READER_CONFIGURATION_INVALID` | Intervals not greater than 0, heartbeat shorter than the communication interval, or firmware not like `2.4.1`. The extra property `errors` lists every broken rule: `MODE_REQUIRED`, `COMMUNICATION_INTERVAL_INVALID`, `HEARTBEAT_INTERVAL_INVALID`, `HEARTBEAT_LOWER_THAN_COMMUNICATION`, `FIRMWARE_FORMAT`. |
+| 400 | `VALIDATION_FAILED` | A required field is missing. |
+| 404 | `SPACE_NOT_FOUND`, `READER_NOT_FOUND` | Unknown space or reader. |
+| 409 | `READER_ID_TAKEN` | A reader with that id exists. |
+| 409 | `ACTION_NOT_ALLOWED` | The status does not allow the action. |
+
+### Incidents
+
+`Incident`: `{ id, readerId, type, detectedAt, description, resolvedAt }`; `type`: `CONNECTIVITY_FAILURE`,
+`READ_ERROR`, `DEVICE_OFFLINE`, `CONFIGURATION_ERROR`, `HARDWARE_FAILURE`; `resolvedAt` is null while open. They are
+opened by the backend: a reader silent for more than 3 heartbeats goes `OFFLINE` (`DEVICE_OFFLINE`, closed again when it
+sends something), a tap from an unregistered reader (`CONFIGURATION_ERROR`) or from one that cannot process taps
+(`READ_ERROR`), or an error report from the reader itself. A reader never has two open incidents of the same type.
+
+| Route | Notes |
+|---|---|
+| `GET /iot/incidents` | Newest first. Filters `readerId`, `open`. |
+| `POST /iot/incidents/{id}/resolve` | `404 INCIDENT_NOT_FOUND`, `409 INCIDENT_ALREADY_RESOLVED`. |
+
+### Tap events and polling
+
+`TapEvent`: `{ id, cursor, readerId, cardUid, tappedAt, outcome, tone, messageKey, messageParams, displayMessage, source }`.
+`outcome`: `PENDING` (not resolved yet), `ATTENDANCE`, `ACCESS`, `WORK_SHIFT`, `REJECTED`. `tone`: `success`, `info`,
+`error` (null while `PENDING`). `displayMessage` is the Spanish text the reader showed; `messageKey` (`tap.*`) and
+`messageParams` let you translate it yourself. `source`: `READER` or `SIMULATOR`. `cardUid` looks like `04:3D:9B:12:8F`.
+Until the attendance and access rules exist (phase 5) every valid tap resolves as `ACCESS` / `tap.received`
+("Lectura recibida"); a tap from a reader that cannot process taps, or with an unknown or inactive card, resolves as
+`REJECTED` (`tap.readerOutOfService`, `tap.cardNotRegistered`, `tap.cardInactive`).
+
+| Route | Notes |
+|---|---|
+| `GET /iot/tap-events` | Every reader. Filter `readerId`. |
+| `GET /iot/readers/{id}/tap-events` | One reader. |
+| `GET /iot/tap-events/{id}` | `404 TAP_EVENT_NOT_FOUND`. |
+
+The two list routes answer `{ items: [TapEvent], nextCursor: "1234" }`, newest first, at most `limit` items (default 50,
+at most 200). **To poll** (every 2 seconds is fine): call once without `after`, keep `nextCursor`, and call again with
+`?after=<nextCursor>`; you get only the events stored since, and `nextCursor` stays the same when nothing is new. A tap
+still `PENDING` in one answer is not returned again with its result: look it up by id (or poll without `after` and
+replace by id) until its `outcome` changes; resolution normally takes well under a second. `400 INVALID_CURSOR` for a
+cursor that is not a number.
+
+### Simulate a tap
+
+`POST /iot/readers/{id}/taps` with `{ "cardUid": "04:3D:9B:12:8F" }` (any case, with or without colons) makes the
+backend publish a tap to the broker as the reader would. The call waits up to 3 seconds: `200` with the resolved
+`TapEvent`, or `202` with the event still `PENDING`. A tap that is rejected (unknown reader, reader out of service,
+unknown or inactive card) is still `200` with outcome `REJECTED`. `400 INVALID_CARD_UID`.
+
+### What a real reader sends (Wokwi)
+
+Readers speak MQTT to the broker; the topics and payloads are the device contract v1 in the plan (section 4). The
+backend replies on `tarjepafi/readers/{readerId}/display` with `{ eventId, tone, lines }`. Messages that break the
+contract are retried three times and then parked in `iot.device-events.queue.dlq`. The frontend never talks MQTT.
+
 ## Demo accounts (profile `demo`)
 
 | E-mail | Password | Role | Status |
@@ -190,4 +281,5 @@ Request examples that run against any environment: `docs/http/iam.http`.
 ## Changelog
 
 - 2026-11-23 · First version: IAM and the simulated clock.
+- 2026-11-24 · IoT section (readers, incidents, tap events with polling, simulated taps). Not frozen until verified on the deployed API.
 - 2026-11-23 · Credentials section (cards, card holders, permissions, enrollment verification, settings, catalogues), verified on the deployed API and **frozen**: from now on only additive changes, announced here.

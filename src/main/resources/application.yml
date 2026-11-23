@@ -27,6 +27,16 @@ spring:
     username: ${RABBITMQ_USERNAME:tarjepafi}
     password: ${RABBITMQ_PASSWORD:tarjepafi}
     virtual-host: ${RABBITMQ_VHOST:/}
+    listener:
+      simple:
+        # A message that fails (malformed payload, database down) is tried 3 times and then dead-lettered
+        # to the <queue>.dlq of the queue it came from (queues declare tarjepafi.dlx, see Topology).
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 500ms
+          multiplier: 2
 
 server:
   port: ${PORT:8080}

@@ -9,7 +9,7 @@ How to use this file:
 
 ## Current state
 
-- Date: 2026-11-23
+- Date: 2026-11-24
 - **Plan revision 4 (team decision of 2026-11-22): no web app work in this plan.** Another team member rebuilds the
   frontend from this backend and the Wokwi reader. Scope here: backend, firmware, deployment, and the API contract
   as a deliverable (plan D2, D13, D14, section 8). The web app steps of the checklist were replaced by contract steps.
@@ -30,16 +30,25 @@ How to use this file:
   card holders, permissions, enrollment verification, settings and the catalogues work on
   `https://tarjepafi-api-pafi7k2.azurewebsites.net`; `docs/API.md` is frozen for them. The backend declares the exchanges,
   so the broker creates `reader-demo` by itself (checked by restarting the ACI container, then the MQTT permission
-  checks again). Phases 4 to 9 are not started; there is no firmware yet.
+  checks again).
+- **Phase 4 is implemented and tested locally, not deployed** (branch `feature/iot-backbone`): `V6`, reader management,
+  the MQTT ingestion pipeline (`DeviceEventConsumer`, idempotent, DLQ), heartbeats, offline detection, incidents, the
+  tap-resolved consumer with the display reply, the temporary fallback resolver, polling endpoints and simulated taps.
+  116 tests green on JDK 25. `docs/API.md` has the IoT section and `docs/http/iot.http` exists. Phases 5 to 9 are not
+  started; there is no firmware yet.
 
 ## Next step
 
-1. Phase 4 (IoT: readers, messaging backbone, ingestion), first step 4.1 (queues, bindings and dead letter queues of plan
-   section 4). Branch off `develop`.
+1. Phase 4: commit, PR to `develop` (the person decides), merge, let CI publish the image, restart the App Service app,
+   then run the Verify block on the deployed environment: `mosquitto_pub` of a v1 tap payload against the ACI broker
+   creates one event in `GET /iot/readers/{id}/tap-events` (and in the `after` poll), publishing it twice yields one, a
+   malformed payload lands in `iot.device-events.queue.dlq`, an unregistered reader opens an incident, and
+   `mosquitto_sub` on `tarjepafi/readers/<id>/display` sees the reply. Also run `docs/http/iot.http`. Then tick 4.9 and the
+   Verify block and freeze the IoT section of `docs/API.md`. Afterwards truncate the IoT tables in Neon and restart the
+   app so the showcase starts from the seed (as after phase 3).
 2. Hand the frontend owner the deployed URL, Swagger UI and `docs/API.md` (plan section 8) and ask for their origins
    (`CORS_ALLOWED_ORIGINS`); today only `http://localhost:4200` is allowed.
-3. Small debts: Swagger request/response examples for IAM and credentials (D14), and `az` needs a fresh login when it
-   asks (tokens expire after 90 days idle).
+3. Phase 5 (tap resolution: attendance and access).
 
 ## Checklist
 
@@ -84,16 +93,16 @@ How to use this file:
 - [x] Verify block passed (2026-11-23, deployed API: 34 of 34 requests of `credentials.http` gave the documented status, values checked afterwards)
 
 ### Phase 4 · IoT: readers, messaging backbone, ingestion
-- [ ] 4.1 RabbitMQ topology
-- [ ] 4.2 Tables and domain
-- [ ] 4.3 Reader endpoints (TS05–TS09)
-- [ ] 4.4 `DeviceEventConsumer` + `DevicePayloadAdapter` (TS10)
-- [ ] 4.5 Heartbeats and offline detection (TS11)
-- [ ] 4.6 `POST /iot/readers/{id}/taps`
-- [ ] 4.7 Tap-resolved consumer and display reply
-- [ ] 4.8 Temporary fallback resolver
-- [ ] 4.9 Contract (polling-friendly tap events, incidents, reader status); frozen after Verify
-- [ ] Verify block passed
+- [x] 4.1 RabbitMQ topology (device events, tap resolved and fallback queues with their DLQs; the other queues of plan section 4 are declared by the contexts that consume them, in phase 5 onwards)
+- [x] 4.2 Tables and domain (`V6`; ported `iot-domain.spec.ts` and `iot-events-domain.spec.ts`: 16 unit tests)
+- [x] 4.3 Reader endpoints (TS05–TS09)
+- [x] 4.4 `DeviceEventConsumer` + `DevicePayloadAdapter` (TS10): idempotent on `eventId`, malformed payloads end in the DLQ (7 adapter tests, pipeline tests against RabbitMQ)
+- [x] 4.5 Heartbeats and offline detection (TS11): telemetry, heartbeat and error messages, `ConnectivityMonitor` every 30 s
+- [x] 4.6 `POST /iot/readers/{id}/taps`
+- [x] 4.7 Tap-resolved consumer and display reply
+- [x] 4.8 Temporary fallback resolver (`tap.received`; removed in 5.5)
+- [ ] 4.9 Contract (polling-friendly tap events, incidents, reader status); frozen after Verify. Written (`docs/API.md`, `docs/http/iot.http`), not yet run against the deployed API
+- [ ] Verify block passed (local: 116 tests green; not yet on the deployed environment)
 
 ### Phase 5 · Tap resolution: attendance and access
 - [ ] 5.1 Attendance tables and domain
@@ -265,3 +274,17 @@ How to use this file:
   reader user was created without help once the backend reconnected, and the MQTT checks (publish tap, receive display,
   `#` denied, other topic refused, wrong password refused) passed again. A script bug is worth remembering: Git Bash
   `/tmp` is not the path Windows Python sees, so write response files under the scratchpad or parse in Python.
+- 2026-11-24 · Phase 4 written and tested locally. Decisions: (1) a tap is stored once per `eventId` and starts `PENDING`;
+  IoT itself rejects (outcome `REJECTED`, reply on the display) taps from an unregistered reader or one that cannot process
+  taps, and taps of an unknown, inactive or unlinked card; those readers also get an incident (never two open incidents of
+  one type per reader). Valid taps are announced as `iot.card-tap` and answered by whoever publishes
+  `<context>.tap-resolved`. (2) The device contract gained `Heartbeat`, `ReaderError` and an optional `source` (plan section
+  4 updated). (3) `cursor` is a database identity column (`seq`), the polling endpoints return `{items, nextCursor}`
+  newest first; a still-`PENDING` tap is not repeated, clients look it up by id. (4) Only the queues with a consumer are
+  declared (device events, tap resolved, fallback); the plan's other queues come with phases 5 and 7. (5) A malformed
+  payload is retried three times (500 ms, 1 s) and parked in the queue's `.dlq`; retry settings are global
+  (`spring.rabbitmq.listener.simple.retry`). (6) With the simulated clock nothing goes offline until the clock moves; the
+  `ConnectivityMonitor` runs every 30 s and `DeviceEventHandler.markOffline` is what it calls. Lessons: Hibernate needs
+  `@Generated(event = INSERT)` to read an identity column back; RabbitMQ 4 needs exclusive queues in tests; two telemetry
+  samples in the same simulated second tie, so tests stamp them apart; the Bash tool of this environment chokes on some
+  heredocs (backslashes, triple quotes), write such files with the Write tool.
