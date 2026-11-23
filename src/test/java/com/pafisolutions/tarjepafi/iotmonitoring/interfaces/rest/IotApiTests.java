@@ -100,10 +100,13 @@ class IotApiTests {
     publish("RDR-A-301", "tap", tapPayload(eventId, "RDR-A-301", STUDENT_CARD));
 
     JsonNode event = awaitResolved(eventId);
-    assertThat(event.path("outcome").asString()).isEqualTo("ACCESS");
-    assertThat(event.path("tone").asString()).isEqualTo("info");
-    assertThat(event.path("messageKey").asString()).isEqualTo("tap.received");
-    assertThat(event.path("displayMessage").asString()).isEqualTo("Lectura recibida");
+    // The student is enrolled in the class of RDR-A-301 that is in progress at the simulated 09:50; another
+    // test may have tapped before, so it is either the first mark or "already registered".
+    assertThat(event.path("outcome").asString()).isEqualTo("ATTENDANCE");
+    assertThat(event.path("messageKey").asString())
+        .isIn("tap.attendanceTaken", "tap.alreadyRegistered");
+    assertThat(event.path("displayMessage").asString())
+        .isIn("Asistencia tomada · Aplicaciones Web · 10:00–11:30", "Tu asistencia ya fue registrada");
     assertThat(event.path("source").asString()).isEqualTo("READER");
     assertThat(event.path("cardUid").asString()).isEqualTo(STUDENT_CARD);
 
@@ -111,19 +114,29 @@ class IotApiTests {
     assertThat(reply).isNotNull();
     JsonNode body = mapper.readTree(new String(reply.getBody(), StandardCharsets.UTF_8));
     assertThat(body.path("eventId").asString()).isEqualTo(eventId);
-    assertThat(body.path("tone").asString()).isEqualTo("info");
-    assertThat(body.path("lines").get(0).asString()).isEqualTo("Lectura recibida");
+    assertThat(body.path("tone").asString()).isIn("success", "info");
+    assertThat(body.path("lines").get(0).asString())
+        .isIn("Asistencia tomada", "Tu asistencia ya fue registrada");
   }
 
   @Test
-  void tap_sameEventPublishedTwice_yieldsOneEvent() throws Exception {
+  void tap_sameEventPublishedTwice_yieldsOneEventAndTheReaderIsToldItWasProcessed() throws Exception {
+    Queue display = bindDisplayQueue("RDR-A-303");
     String eventId = UUID.randomUUID().toString();
     String payload = tapPayload(eventId, "RDR-A-303", STUDENT_CARD);
 
     publish("RDR-A-303", "tap", payload);
-    publish("RDR-A-303", "tap", payload);
     awaitResolved(eventId);
-    Thread.sleep(1000);
+    publish("RDR-A-303", "tap", payload);
+    Thread.sleep(1500);
+    // The first reply is the resolution; the second says the event was already processed.
+    var replies = new java.util.ArrayList<String>();
+    Message reply;
+    while ((reply = template.receive(display.getName())) != null) {
+      replies.add(new String(reply.getBody(), StandardCharsets.UTF_8));
+    }
+    assertThat(replies).hasSize(2);
+    assertThat(replies.get(1)).contains("Evento ya procesado");
 
     JsonNode page = getJson("/api/v1/iot/tap-events?readerId=RDR-A-303&limit=200");
     long copies = 0;
@@ -258,7 +271,7 @@ class IotApiTests {
   void simulatedTap_throughTheApi_travelsThePipelineAndAnswersResolved() throws Exception {
     mvc.perform(as(post("/api/v1/iot/readers/RDR-A-301/taps")).content("{\"cardUid\":\"043d9b128f\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.outcome").value("ACCESS"))
+        .andExpect(jsonPath("$.outcome").value("ATTENDANCE"))
         .andExpect(jsonPath("$.source").value("SIMULATOR"))
         .andExpect(jsonPath("$.cardUid").value(STUDENT_CARD));
     mvc.perform(as(post("/api/v1/iot/readers/RDR-Z-998/taps")).content("{\"cardUid\":\"043d9b128f\"}"))

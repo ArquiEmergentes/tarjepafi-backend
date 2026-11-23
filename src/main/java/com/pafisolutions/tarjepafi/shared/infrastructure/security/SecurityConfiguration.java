@@ -61,8 +61,21 @@ public class SecurityConfiguration {
                     .permitAll()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/simulation/clock")
                     .hasRole("ADMIN")
-                    .requestMatchers("/api/v1/credentials/**", "/api/v1/card-holders/**", "/api/v1/iot/**")
+                    .requestMatchers(
+                        "/api/v1/credentials/**",
+                        "/api/v1/card-holders/**",
+                        "/api/v1/iot/**",
+                        "/api/v1/access-records/**",
+                        "/api/v1/work-shifts/**")
                     .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/spaces")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/spaces/**")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/spaces/*/occupancy")
+                    .hasRole("ADMIN")
+                    .requestMatchers("/api/v1/class-sessions/**")
+                    .hasRole("TEACHER")
                     .anyRequest()
                     .authenticated());
     return http.build();

@@ -66,7 +66,7 @@ Authorization: Bearer {{token}}
 POST {{host}}/api/v1/iot/readers/RDR-X-001/deactivate
 Authorization: Bearer {{token}}
 
-### 6. Simulated tap on a classroom reader with a student's card (expect 200, outcome ACCESS, tap.received for now)
+### 6. Simulated tap on a classroom reader with a student's card (expect 200; since phase 5 outcome ATTENDANCE, see attendance.http and demo.http)
 POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
 Authorization: Bearer {{token}}
 Content-Type: application/json

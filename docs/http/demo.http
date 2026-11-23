@@ -1,0 +1,144 @@
+### The demo script (plan section 6) as requests: clock, injected taps, reads. Works with the VS Code "REST Client"
+### extension and the IntelliJ HTTP client. Needs the ADMIN role for the taps and the TEACHER role for the reads.
+### Run it from the top, in order, on a freshly seeded environment (restart the app to reseed). Each step says
+### what the answer should show. The clock starts at Wednesday 2026-10-07 09:50, ten minutes before the class
+### "Aplicaciones Web" of the demo teacher (A-301, 10:00-11:30).
+@host = https://tarjepafi-api-pafi7k2.azurewebsites.net
+# @host = http://localhost:8080
+@adminEmail = admin@upc.edu.pe
+@adminPassword = Admin123*
+
+### 0. Sign in as administrator and as the demo teacher (the deployed demo uses another admin password)
+# @name adminSignIn
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "{{adminEmail}}", "password": "{{adminPassword}}" }
+
+###
+# @name teacherSignIn
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "docente@upc.edu.pe", "password": "Docente123*" }
+
+###
+@admin = {{adminSignIn.response.body.$.token}}
+@teacher = {{teacherSignIn.response.body.$.token}}
+
+### 1. Put the clock at the start of the demo (09:50)
+PUT {{host}}/api/v1/simulation/clock
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "now": "2026-10-07T09:50:00" }
+
+### 2. The student (U202312966) taps in A-301.
+###    Expect outcome ATTENDANCE, displayMessage "Asistencia tomada · Aplicaciones Web · 10:00–11:30".
+###    Her mark is PENDING until the teacher arrives.
+POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "cardUid": "04:3D:9B:12:8F" }
+
+### 3. Tap again: "Tu asistencia ya fue registrada" (tap.alreadyRegistered)
+POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "cardUid": "04:3D:9B:12:8F" }
+
+### 4. A student who is not enrolled (U202310137): REJECTED "No estás matriculado en esta clase"
+POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "cardUid": "04:73:3C:F2:5C" }
+
+### 5. The teacher (D0001) arrives: "Llegada registrada · Aplicaciones Web – Desarrollo de Software · 1 asistencias confirmadas".
+###    The pending mark of step 2 becomes PRESENT and the session IN_PROGRESS.
+POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "cardUid": "04:56:76:31:15" }
+
+### 6. Teacher view of the session: roster, counts (present 1), teacherRecord
+GET {{host}}/api/v1/class-sessions/ses-02-7
+Authorization: Bearer {{teacher}}
+
+### 7. Move the clock to 10:20 (it is a +30 minute jump; the clock keeps ticking in real time from there)
+PUT {{host}}/api/v1/simulation/clock
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "now": "2026-10-07T10:20:00" }
+
+### 8. U202310685 taps: his mark is LATE at once (the teacher is already there)
+POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "cardUid": "04:A0:3C:AE:C6" }
+
+### 9. The teacher justifies an absence with a reason (a blank reason answers 400)
+POST {{host}}/api/v1/class-sessions/ses-02-7/attendance/ch-u202310411/justify
+Authorization: Bearer {{teacher}}
+Content-Type: application/json
+
+{ "reason": "Certificado medico" }
+
+### 10. Move the clock to 11:20 and the teacher taps again: "Salida registrada · Duración 1 h 30 min"
+PUT {{host}}/api/v1/simulation/clock
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "now": "2026-10-07T11:20:00" }
+
+###
+POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "cardUid": "04:56:76:31:15" }
+
+### 11. The session is FINISHED and every enrolled student without a mark is ABSENT (counts: absent 17, justified 1, late 1, present 1)
+GET {{host}}/api/v1/class-sessions/ses-02-7
+Authorization: Bearer {{teacher}}
+
+### 12. Staff at the turnstile (T0001, shift open since 06:56): exit closes it, entry opens a new one
+PUT {{host}}/api/v1/simulation/clock
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "now": "2026-10-07T15:00:00" }
+
+###
+POST {{host}}/api/v1/iot/readers/RDR-T-003/taps
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "cardUid": "04:F7:D9:2D:73" }
+
+###
+GET {{host}}/api/v1/work-shifts?cardHolderId=ch-t0001
+Authorization: Bearer {{admin}}
+
+### 13. An unauthorised role (a student at the server room): REJECTED "Acceso denegado", a DENIED access record
+POST {{host}}/api/v1/iot/readers/RDR-D-003/taps
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "cardUid": "04:3D:9B:12:8F" }
+
+###
+GET {{host}}/api/v1/access-records?decision=DENIED&limit=5
+Authorization: Bearer {{admin}}
+
+### 14. Put the clock back to the start (and restart the app if you want the seed data again)
+PUT {{host}}/api/v1/simulation/clock
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{ "now": "2026-10-07T09:50:00" }

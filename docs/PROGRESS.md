@@ -41,9 +41,10 @@ How to use this file:
 
 ## Next step
 
-1. Phase 5 (tap resolution: attendance and access), first step 5.1 (attendance tables and domain). Branch off `develop`.
-   Remember 5.5 removes `FallbackTapResolver` and the phase 5 Verify block (milestone M2) changes what `docs/API.md` says
-   about the outcome of taps.
+1. Phase 5 is implemented and tested locally on `feature/phase5-tap-resolution` (uncommitted): commit, PR, CI image,
+   restart the App Service app, then run `docs/http/demo.http` and the other two `.http` files against the deployed API
+   and tick the Verify block (milestone M2). Truncate the context tables on Neon afterwards (`sessions`,
+   `session_participants`, `attendance_records`, `access_records`, `work_shifts`, plus the IoT ones) and restart to reseed.
 2. Hand the frontend owner the deployed URL, Swagger UI and `docs/API.md` (plan section 8) and ask for their origins
    (`CORS_ALLOWED_ORIGINS`); today only `http://localhost:4200` is allowed. IAM, credentials and IoT are frozen.
 3. Small debts: Swagger request/response examples for IAM, credentials and IoT (D14).
@@ -103,13 +104,13 @@ How to use this file:
 - [x] Verify block passed (2026-11-24, deployed: `mosquitto_pub` tap creates one event seen by the `after` poll, a repeat yields one, malformed payload in the DLQ, unregistered reader gives an incident, `mosquitto_sub` on `.../display` sees the reply)
 
 ### Phase 5 · Tap resolution: attendance and access
-- [ ] 5.1 Attendance tables and domain
-- [ ] 5.2 `CardTapEventConsumer` (TS13)
-- [ ] 5.3 Auto-close, teacher endpoints, TS12, TS14–TS17
-- [ ] 5.4 Space & Facility consumer and endpoints (TS18, TS19, TS22, TS28, TS30)
-- [ ] 5.5 Remove fallback resolver
-- [ ] 5.6 Contract + `docs/http/demo.http`; frozen after Verify
-- [ ] Verify block passed (milestone M2)
+- [x] 5.1 Attendance tables and domain (`V7`: sessions, session participants, attendance records; `AttendanceDomainTest`, 10 tests)
+- [x] 5.2 `CardTapEventConsumer` (TS13), `attendance.card-tap.queue`, `AttendanceTapService`
+- [x] 5.3 Auto-close (`SessionAutoCloseJob`, every 30 s, and before every tap or teacher read), teacher endpoints `/class-sessions/**` (TS14–TS17). TS12 as "class-session consumers" is **not** built: sessions come from the seed only, see the log
+- [x] 5.4 Space & Facility: `V8` (access records, work shifts, `@Version` on spaces), `SpaceCardTapEventConsumer` (TS22 without reservations), `AccessControlService`, TS18, TS19, TS28, TS30 and the access-record / work-shift reads
+- [x] 5.5 Fallback resolver removed
+- [x] 5.6 Contract written (`docs/API.md`, `docs/http/attendance.http`, `space-facility.http`, `demo.http`); **not frozen until the Verify block passes on the deployed API**
+- [ ] Verify block passed (milestone M2). Local: `TapResolutionApiTests` (6) replay the demo walkthrough and acceptance 01 to 04 and 07 against real PostgreSQL and RabbitMQ, 132 tests green; still to run on the deployed API through `demo.http`
 
 ### Phase 6 · Wokwi firmware and the live showcase
 - [ ] 6.1 Project files and circuit
@@ -297,3 +298,15 @@ How to use this file:
   `#`. The simulated tap through the API also resolved. Afterwards the IoT tables were truncated in Neon, the DLQ purged
   and the app restarted, which restored the seed (20 readers, 5 open incidents). On Windows `az` is `az.cmd` when run from
   Python's `subprocess`.
+- 2026-11-24 · Phase 5 implemented locally (not deployed). Decisions and things the next person could not guess:
+  tap routing is decided inside each consumer from the space type and the holder role (`attendance.card-tap.queue` and
+  `space.card-tap.queue` both bind `iot.card-tap`; space asks `AttendanceFacade.hasMeetingInProgress` for teachers in meeting
+  rooms); IoT rejects unknown/inactive cards itself and now adds `spaceId`, `credentialId` and `cardHolderId` to
+  `iot.tap-rejected`, which space reads to leave a DENIED access record at non-classroom readers. A tap is decided from
+  its own time, not from the clock, and sessions due at that time are closed first. A duplicate event is not stored again but
+  the reader is told "Evento ya procesado". The simulated clock keeps ticking in real time after a move (a tap is stamped a
+  second before "now"), so ranges in tests start a little earlier than the tap. TS12 "class-session consumers" and the
+  `attendance.class-session.queue` are not built: sessions exist only from the seed (14 sessions, 5 to 10 October), so the
+  demo works for those days. TS19 occupancy counts only the campus (people who entered today and have not left), other
+  spaces answer `tracked: false`; TS30 presences are derived from granted campus entry/exit access records (no separate
+  `CampusPresence` table). `jsalazar@upc.edu.pe` is INACTIVE in the seed, so the third teacher cannot sign in.

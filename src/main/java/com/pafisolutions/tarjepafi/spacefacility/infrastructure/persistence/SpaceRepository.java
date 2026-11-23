@@ -9,4 +9,6 @@ public interface SpaceRepository extends JpaRepository<Space, String> {
   List<Space> findByTypeOrderByCode(String type);
 
   List<Space> findAllByOrderByCode();
+
+  boolean existsByCode(String code);
 }
