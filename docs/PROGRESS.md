@@ -20,7 +20,7 @@ How to use this file:
   (`https://tarjepafi-api-pafi7k2.azurewebsites.net`), broker `aci-tarjepafi-broker`
   (`tarjepafi-broker-pafi7k2.chilecentral.azurecontainer.io`), Neon database. Images come from GHCR (public).
   Generated secrets live outside the repo, in `~/.tarjepafi-secrets.env`, and the Neon values in
-  `~/.tarjepafi-neon.env`. CORS allows `http://localhost:4200` only until the frontend owner gives their origins.
+  `~/.tarjepafi-neon.env`. CORS allows `http://localhost:4781` (the port the frontend must use) and `http://localhost:4200` until the frontend owner gives their origins.
 - **Azure CLI sessions expire** after 90 days idle: run `az login` again before any cloud step.
 - Git: `main` and `develop` exist; the revision 4 plan and the phase 2 docs are merged into `develop` (PRs #2 and #3).
   Phase 3 is on `feature/credentials-catalogues`, uncommitted.

@@ -89,7 +89,7 @@ Backend app settings (names only; values come from Neon and the password manager
 | `DB_USERNAME`, `DB_PASSWORD` | from Neon |
 | `RABBITMQ_HOST` | the ACI DNS name above |
 | `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | `tarjepafi-backend` and `<backend-pass>` |
-| `CORS_ALLOWED_ORIGINS` | the frontend owner's dev and deployed origins, comma-separated, no trailing slash |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:4781` (the frontend dev port, stated in `docs/API.md`) plus the frontend owner's deployed origin, comma-separated, no trailing slash |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | optional first administrator (TS01) |
 
 The reader user only appears once the backend has started and declared `tarjepafi.devices`: **start the backend before
