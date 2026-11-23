@@ -281,5 +281,5 @@ Request examples that run against any environment: `docs/http/iam.http`.
 ## Changelog
 
 - 2026-11-23 · First version: IAM and the simulated clock.
-- 2026-11-24 · IoT section (readers, incidents, tap events with polling, simulated taps). Not frozen until verified on the deployed API.
+- 2026-11-24 · IoT section (readers, incidents, tap events with polling, simulated taps), verified on the deployed API and **frozen**: from now on only additive changes, announced here. Until phase 5 every valid tap resolves as `ACCESS` / `tap.received`; `outcome`, `tone`, `messageKey` and `displayMessage` of those events will change when the attendance and access rules arrive.
 - 2026-11-23 · Credentials section (cards, card holders, permissions, enrollment verification, settings, catalogues), verified on the deployed API and **frozen**: from now on only additive changes, announced here.

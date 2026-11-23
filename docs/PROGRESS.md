@@ -31,7 +31,9 @@ How to use this file:
   `https://tarjepafi-api-pafi7k2.azurewebsites.net`; `docs/API.md` is frozen for them. The backend declares the exchanges,
   so the broker creates `reader-demo` by itself (checked by restarting the ACI container, then the MQTT permission
   checks again).
-- **Phase 4 is implemented and tested locally, not deployed** (branch `feature/iot-backbone`): `V6`, reader management,
+- **Phase 4 is deployed and verified (2026-11-24)**, PR #6 merged, CI image restarted on Azure; the Verify block passed 11 of 11
+  against the ACI broker and the deployed API, and the 28 REST requests of `iot.http` gave the documented answers.
+  What it contains: `V6`, reader management,
   the MQTT ingestion pipeline (`DeviceEventConsumer`, idempotent, DLQ), heartbeats, offline detection, incidents, the
   tap-resolved consumer with the display reply, the temporary fallback resolver, polling endpoints and simulated taps.
   116 tests green on JDK 25. `docs/API.md` has the IoT section and `docs/http/iot.http` exists. Phases 5 to 9 are not
@@ -39,16 +41,12 @@ How to use this file:
 
 ## Next step
 
-1. Phase 4: commit, PR to `develop` (the person decides), merge, let CI publish the image, restart the App Service app,
-   then run the Verify block on the deployed environment: `mosquitto_pub` of a v1 tap payload against the ACI broker
-   creates one event in `GET /iot/readers/{id}/tap-events` (and in the `after` poll), publishing it twice yields one, a
-   malformed payload lands in `iot.device-events.queue.dlq`, an unregistered reader opens an incident, and
-   `mosquitto_sub` on `tarjepafi/readers/<id>/display` sees the reply. Also run `docs/http/iot.http`. Then tick 4.9 and the
-   Verify block and freeze the IoT section of `docs/API.md`. Afterwards truncate the IoT tables in Neon and restart the
-   app so the showcase starts from the seed (as after phase 3).
+1. Phase 5 (tap resolution: attendance and access), first step 5.1 (attendance tables and domain). Branch off `develop`.
+   Remember 5.5 removes `FallbackTapResolver` and the phase 5 Verify block (milestone M2) changes what `docs/API.md` says
+   about the outcome of taps.
 2. Hand the frontend owner the deployed URL, Swagger UI and `docs/API.md` (plan section 8) and ask for their origins
-   (`CORS_ALLOWED_ORIGINS`); today only `http://localhost:4200` is allowed.
-3. Phase 5 (tap resolution: attendance and access).
+   (`CORS_ALLOWED_ORIGINS`); today only `http://localhost:4200` is allowed. IAM, credentials and IoT are frozen.
+3. Small debts: Swagger request/response examples for IAM, credentials and IoT (D14).
 
 ## Checklist
 
@@ -101,8 +99,8 @@ How to use this file:
 - [x] 4.6 `POST /iot/readers/{id}/taps`
 - [x] 4.7 Tap-resolved consumer and display reply
 - [x] 4.8 Temporary fallback resolver (`tap.received`; removed in 5.5)
-- [ ] 4.9 Contract (polling-friendly tap events, incidents, reader status); frozen after Verify. Written (`docs/API.md`, `docs/http/iot.http`), not yet run against the deployed API
-- [ ] Verify block passed (local: 116 tests green; not yet on the deployed environment)
+- [x] 4.9 Contract (polling-friendly tap events, incidents, reader status); frozen after Verify (28 of 28 requests of `iot.http` as documented on the deployed API)
+- [x] Verify block passed (2026-11-24, deployed: `mosquitto_pub` tap creates one event seen by the `after` poll, a repeat yields one, malformed payload in the DLQ, unregistered reader gives an incident, `mosquitto_sub` on `.../display` sees the reply)
 
 ### Phase 5 · Tap resolution: attendance and access
 - [ ] 5.1 Attendance tables and domain
@@ -288,3 +286,14 @@ How to use this file:
   `@Generated(event = INSERT)` to read an identity column back; RabbitMQ 4 needs exclusive queues in tests; two telemetry
   samples in the same simulated second tie, so tests stamp them apart; the Bash tool of this environment chokes on some
   heredocs (backslashes, triple quotes), write such files with the Write tool.
+- 2026-11-24 · Phase 4 deployed and verified. After CI published the image (`develop` at `bc50a8a`) the App Service app was
+  stopped and started; Flyway created `V6` on Neon and the demo seed imported 20 readers, 114 telemetry samples, 7 incidents
+  and 246 tap events. Verify block against the deployed environment (11 of 11): a v1 tap published with `mosquitto_pub` as
+  `reader-demo` became one `ACCESS` / `tap.received` event, found by the `after` poll and by
+  `GET /iot/readers/RDR-A-301/tap-events`; the display reply `{eventId, tone: "info", lines: ["Lectura recibida"]}` reached
+  `mosquitto_sub` on `tarjepafi/readers/RDR-A-301/display`; the same event published twice more still gave one; `this is not
+  json` ended in `iot.device-events.queue.dlq` (checked with `rabbitmqctl list_queues` inside the container); a tap of an
+  unregistered reader was `REJECTED` and opened a `CONFIGURATION_ERROR` incident; `reader-demo` still cannot subscribe to
+  `#`. The simulated tap through the API also resolved. Afterwards the IoT tables were truncated in Neon, the DLQ purged
+  and the app restarted, which restored the seed (20 readers, 5 open incidents). On Windows `az` is `az.cmd` when run from
+  Python's `subprocess`.
