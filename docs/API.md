@@ -232,9 +232,10 @@ sends something), a tap from an unregistered reader (`CONFIGURATION_ERROR`) or f
 `outcome`: `PENDING` (not resolved yet), `ATTENDANCE`, `ACCESS`, `WORK_SHIFT`, `REJECTED`. `tone`: `success`, `info`,
 `error` (null while `PENDING`). `displayMessage` is the Spanish text the reader showed; `messageKey` (`tap.*`) and
 `messageParams` let you translate it yourself. `source`: `READER` or `SIMULATOR`. `cardUid` looks like `04:3D:9B:12:8F`.
-Until the attendance and access rules exist (phase 5) every valid tap resolves as `ACCESS` / `tap.received`
-("Lectura recibida"); a tap from a reader that cannot process taps, or with an unknown or inactive card, resolves as
-`REJECTED` (`tap.readerOutOfService`, `tap.cardNotRegistered`, `tap.cardInactive`).
+Since phase 5 the outcome is the real one: attendance rules for classrooms and meetings, access rules for everything
+else (see the next two sections). A tap from a reader that cannot process taps, or with an unknown or inactive card,
+resolves as `REJECTED` (`tap.readerOutOfService`, `tap.cardNotRegistered`, `tap.cardInactive`). The message
+`tap.received` ("Lectura recibida") is no longer produced.
 
 | Route | Notes |
 |---|---|
@@ -262,6 +263,78 @@ Readers speak MQTT to the broker; the topics and payloads are the device contrac
 backend replies on `tarjepafi/readers/{readerId}/display` with `{ eventId, tone, lines }`. Messages that break the
 contract are retried three times and then parked in `iot.device-events.queue.dlq`. The frontend never talks MQTT.
 
+## Attendance and class sessions (phase 5)
+
+How a tap becomes attendance (the reader shows the answer, you read the result with the routes below): a student's tap in
+a classroom with a class in progress (15 minutes before the start until the end) and an active enrollment creates a mark
+that stays `PENDING` until the teacher taps; the teacher's first tap starts the session and confirms the pending marks
+(`PRESENT` up to start + tolerance, otherwise `LATE`), the second tap is the departure (duration) and closes the session,
+a third one only answers "already registered". 15 minutes after the end a session nobody closed is closed by the system:
+every enrolled student without a mark gets an `ABSENT` record (`source: SYSTEM`); `PENDING` marks stay for the teacher.
+Meetings work like classes for the invited teachers (no `PENDING`). Time rules use the campus clock.
+
+These routes are for the **TEACHER** role (an admin gets `403`); the teacher is the caller's card holder.
+
+`Session`: `{ id, type (CLASS, MEETING), scheduleId, title, spaceId, date, scheduledStart, scheduledEnd, toleranceMinutes,
+status (SCHEDULED, IN_PROGRESS, FINISHED) }`.
+`AttendanceRecord`: `{ id, cursor, tapEventId, sessionId, cardHolderId, role (STUDENT, TEACHER), checkInAt, checkOutAt,
+durationMinutes, status (PENDING, PRESENT, LATE, ABSENT, JUSTIFIED), confirmedAt, source (NFC, TEACHER_EDIT, SYSTEM),
+modifiedBy, modifiedAt, editReason }`.
+
+| Route | Answer and errors |
+|---|---|
+| `GET /class-sessions/mine?date=` | My classes of the day (default today by the campus clock): `[{ session, course: { id, code, name, subject, section }, teacherRecord, counts: { pending, present, late, absent, justified, unmarked, total } }]`. |
+| `GET /class-sessions/{id}` | The same plus `roster: [{ cardHolderId, fullName, code, record }]` (`record` is null for a student without a mark). `404 SESSION_NOT_FOUND`, `403 NOT_YOUR_SESSION`. |
+| `GET /class-sessions/{id}/attendance` | **Polling.** `{ items: [AttendanceRecord], nextCursor }`, newest first, `after`, `limit` (default 100, at most 500). A record that changes keeps its cursor: reload the detail to see edits. `400 INVALID_CURSOR`. |
+| `POST /class-sessions/{id}/confirm-pending` | `{ confirmed: n }`: every `PENDING` mark becomes `PRESENT` or `LATE` by its own time (TS14). `409 SESSION_NOT_STARTED` (still `SCHEDULED`), `409 NOTHING_TO_CONFIRM`. |
+| `PUT /class-sessions/{id}/attendance/{studentId}` | Body `{ status (PRESENT, LATE, ABSENT, JUSTIFIED), reason }`; `reason` is required, at most 255 (TS15). Creates the record when the student has none. Answers the `AttendanceRecord` (`source: TEACHER_EDIT`, `modifiedBy`, `editReason`). `400` (blank reason / status), `409 SESSION_NOT_STARTED`, `422 STUDENT_NOT_ENROLLED`. |
+| `POST /class-sessions/{id}/attendance/{studentId}/justify` | Body `{ reason }`: sets `JUSTIFIED` (TS16). Same errors. |
+| `GET /class-sessions/attendance/mine` | My own marks in my classes, newest first: `[{ record, session, course }]` with arrival, departure and duration. |
+| `GET /class-sessions/meetings/mine` | Meetings and trainings I am invited to, newest first: `[{ session, record }]` (`record` null until I tap). |
+
+Messages the reader shows for attendance (`messageKey`): `tap.attendanceTaken` (params `course`, `time`),
+`tap.alreadyRegistered`, `tap.noClassInProgress`, `tap.notEnrolled`, `tap.teacherArrival` (`course`, `count`),
+`tap.teacherArrivalNoRecords`, `tap.teacherExit` (`duration`, like `1 h 30 min`), `tap.exitAlreadyRegistered`,
+`tap.noAssignedClass`, `tap.notInvited`, `tap.meetingRegistered`, `tap.meetingRegisteredLate`. Outcome `ATTENDANCE`
+(`REJECTED` for the refusals).
+
+## Space access (phase 5)
+
+Who resolves a tap: a reader in a classroom is attendance's (students and teachers; **staff** are space access),
+a teacher in a meeting room with a meeting in progress is attendance's, everything else is space access: spaces,
+laboratories, library, restricted areas and the campus turnstiles. The rules, in order: space under maintenance denies;
+the card's own exception (`ALLOW`/`DENY`, see Credentials) wins; otherwise the role must be in the space's
+`allowedRoles`. Every attempt leaves an access record. A card that is not registered or not active, read at a reader
+that is not in a classroom, leaves a `DENIED` record too (`CARD_NOT_REGISTERED`, `CARD_INACTIVE`).
+At the campus entrance and exit, **staff** open and close their work shift (outcome `WORK_SHIFT`); students and
+teachers only leave the access record (outcome `ACCESS`).
+
+Routes need the **ADMIN** role (reads of spaces stay open to any signed-in user, see Catalogues).
+
+`AccessRecord`: `{ id, cursor, tapEventId, cardUid, credentialId, cardHolderId, spaceId, readerId, accessType
+(CAMPUS_ENTRY, CAMPUS_EXIT, SPACE_ACCESS), decision (GRANTED, DENIED), denialReason (NONE, CARD_NOT_REGISTERED,
+CARD_INACTIVE, UNAUTHORIZED_ROLE, SPACE_IN_MAINTENANCE), attemptedAt }`.
+`WorkShift`: `{ id, cursor, cardHolderId, date, entryAt, exitAt, workedMinutes, status (OPEN, CLOSED) }`.
+
+| Route | Answer and errors |
+|---|---|
+| `GET /access-records` | **Polling.** `{ items, nextCursor }`, newest first. Filters `spaceId`, `cardHolderId`, `decision`; `after`, `limit` (default 50, at most 200). `400 INVALID_CURSOR`. |
+| `GET /work-shifts` | `[WorkShift]`, newest first. Filters `cardHolderId`, `status`, `date`. |
+| `POST /spaces` | Register a space (TS18), body `{ code, name, type, building, floor, capacity, accessPolicy, allowedRoles }`; `type` also accepts `EVENT_VENUE`. `201` AVAILABLE. `409 SPACE_CODE_EXISTS`, `400 INVALID_SPACE_TYPE`, `INVALID_CAPACITY`, `INVALID_ACCESS_POLICY`, `INVALID_ROLE`. |
+| `PATCH /spaces/{id}/status` | Body `{ status }` (`AVAILABLE`, `MAINTENANCE`). Later taps there are denied with `SPACE_IN_MAINTENANCE`. `404 SPACE_NOT_FOUND`, `400 INVALID_SPACE_STATUS`. |
+| `PATCH /spaces/{id}/access-policy` | Body `{ accessPolicy, allowedRoles }` (TS28); later taps use them. `404`, `400 INVALID_ACCESS_POLICY` / `INVALID_ROLE`. |
+| `GET /spaces/{id}/occupancy` | `{ capacity, currentOccupancy, isFull, tracked }` (TS19). Only the campus is counted: for `CAMPUS_ENTRANCE` / `CAMPUS_EXIT` spaces it is the number of people who entered today and have not left (`tracked: true`); every other space answers `tracked: false` and 0. |
+| `GET /card-holders/{id}/campus-presences?from=&to=` | `{ items: [{ entryAt, exitAt, durationMinutes, status (OPEN, CLOSED) }], totalMinutes }` (TS30): a stay is a granted entry up to the next granted exit; an open one has no duration and is not added. `400 INVALID_RANGE` when `from` is after `to`. |
+
+Messages for space access: `tap.accessGranted`, `tap.accessDenied`, `tap.shiftOpened`, `tap.shiftAlreadyOpen`,
+`tap.shiftClosed` (param `worked`, like `8 h 13 min`), `tap.noEntryFound`, `tap.exitAlreadyRegistered`. A tap whose
+event arrives twice is stored once and the reader is told `tap.duplicateEvent` ("Evento ya procesado").
+
+Events published (for information; data management consumes them): `attendance.recorded`, `attendance.confirmed`,
+`attendance.late-detected`, `attendance.edited`, `attendance.rejected`, `attendance.session-closed`,
+`attendance.tap-resolved`, `space.access-granted`, `space.access-denied`, `space.work-shift-opened`,
+`space.work-shift-closed`, `space.tap-resolved`.
+
 ## Demo accounts (profile `demo`)
 
 | E-mail | Password | Role | Status |
@@ -283,3 +356,4 @@ Request examples that run against any environment: `docs/http/iam.http`.
 - 2026-11-23 · First version: IAM and the simulated clock.
 - 2026-11-24 · IoT section (readers, incidents, tap events with polling, simulated taps), verified on the deployed API and **frozen**: from now on only additive changes, announced here. Until phase 5 every valid tap resolves as `ACCESS` / `tap.received`; `outcome`, `tone`, `messageKey` and `displayMessage` of those events will change when the attendance and access rules arrive.
 - 2026-11-23 · Credentials section (cards, card holders, permissions, enrollment verification, settings, catalogues), verified on the deployed API and **frozen**: from now on only additive changes, announced here.
+- 2026-11-24 · Attendance and space access sections (phase 5): teacher routes under `/class-sessions`, `/access-records`, `/work-shifts`, space management and occupancy, campus presences. Not frozen until verified on the deployed API. **Behaviour change of the frozen IoT section:** valid taps no longer resolve as `ACCESS` / `tap.received`; `outcome`, `tone`, `messageKey` and `displayMessage` now come from the attendance and access rules (the shape of `TapEvent` did not change). `POST /spaces` and `PATCH /spaces/**` are new admin-only routes next to the open `GET`s.

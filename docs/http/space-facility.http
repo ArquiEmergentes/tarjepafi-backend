@@ -1,0 +1,83 @@
+### Space & Facility requests (phase 5). Works with the VS Code "REST Client" extension and the IntelliJ HTTP client.
+### Needs the ADMIN role. Run them in order; the state changes carry over (spaces, taps, records).
+@host = https://tarjepafi-api-pafi7k2.azurewebsites.net
+# @host = http://localhost:8080
+@adminEmail = admin@upc.edu.pe
+@adminPassword = Admin123*
+
+### 0. Sign in as administrator (the deployed demo uses another password: ask the backend owner)
+# @name signIn
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "{{adminEmail}}", "password": "{{adminPassword}}" }
+
+###
+@token = {{signIn.response.body.$.token}}
+
+### 1. Register a space (TS18): 201 AVAILABLE; again: 409 SPACE_CODE_EXISTS; capacity 0: 400 INVALID_CAPACITY
+POST {{host}}/api/v1/spaces
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "EVT-01", "name": "Auditorio", "type": "EVENT_VENUE", "building": "Pabellón A", "floor": 1,
+  "capacity": 300, "accessPolicy": "OPEN", "allowedRoles": ["STUDENT", "TEACHER"] }
+
+### 2. Maintenance: taps at RDR-D-001 are denied with SPACE_IN_MAINTENANCE until it is AVAILABLE again
+PATCH {{host}}/api/v1/spaces/sp-lab-c/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "MAINTENANCE" }
+
+###
+POST {{host}}/api/v1/iot/readers/RDR-D-001/taps
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardUid": "04:3D:9B:12:8F" }
+
+###
+PATCH {{host}}/api/v1/spaces/sp-lab-c/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "AVAILABLE" }
+
+### 3. Change the policy of the library (TS28): only staff; 400 INVALID_ROLE for an unknown role
+PATCH {{host}}/api/v1/spaces/sp-bib/access-policy
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "accessPolicy": "RESTRICTED", "allowedRoles": ["STAFF"] }
+
+###
+PATCH {{host}}/api/v1/spaces/sp-bib/access-policy
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "accessPolicy": "OPEN", "allowedRoles": ["STUDENT", "TEACHER", "STAFF"] }
+
+### 4. Occupancy (TS19): the campus entrance counts people inside today; other spaces answer tracked false
+GET {{host}}/api/v1/spaces/sp-ent-01/occupancy
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/spaces/sp-lab-c/occupancy
+Authorization: Bearer {{token}}
+
+### 5. Access records, newest first, polling with `after` (filters spaceId, cardHolderId, decision)
+GET {{host}}/api/v1/access-records?limit=10
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/access-records?decision=DENIED&spaceId=sp-lab-e
+Authorization: Bearer {{token}}
+
+### 6. Work shifts of the staff (filters cardHolderId, status OPEN/CLOSED, date)
+GET {{host}}/api/v1/work-shifts?status=OPEN
+Authorization: Bearer {{token}}
+
+### 7. Stays on campus of a holder (TS30): from and to are campus date-times; 400 INVALID_RANGE when from is after to
+GET {{host}}/api/v1/card-holders/ch-u202312966/campus-presences?from=2026-10-05T00:00:00&to=2026-10-07T23:59:59
+Authorization: Bearer {{token}}

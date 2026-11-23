@@ -1,0 +1,62 @@
+### Attendance requests (phase 5): the teacher's routes. Works with the VS Code "REST Client" extension and the IntelliJ
+### HTTP client. Needs the TEACHER role. The taps that create the data are in demo.http (run its steps 1 to 10 first).
+@host = https://tarjepafi-api-pafi7k2.azurewebsites.net
+# @host = http://localhost:8080
+
+### 0. Sign in as the demo teacher (D0001)
+# @name signIn
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "docente@upc.edu.pe", "password": "Docente123*" }
+
+###
+@token = {{signIn.response.body.$.token}}
+
+### 1. My classes of the day (default today by the campus clock), with attendance counts
+GET {{host}}/api/v1/class-sessions/mine
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/class-sessions/mine?date=2026-10-07
+Authorization: Bearer {{token}}
+
+### 2. One class with its roster (404 SESSION_NOT_FOUND, 403 NOT_YOUR_SESSION for someone else's)
+GET {{host}}/api/v1/class-sessions/ses-02-7
+Authorization: Bearer {{token}}
+
+### 3. Poll the records of the session: first call, then `after=<nextCursor>` of the previous answer
+GET {{host}}/api/v1/class-sessions/ses-02-7/attendance?limit=20
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/class-sessions/ses-02-7/attendance?after=0
+Authorization: Bearer {{token}}
+
+### 4. Confirm the PENDING marks left (409 SESSION_NOT_STARTED while SCHEDULED, 409 NOTHING_TO_CONFIRM)
+POST {{host}}/api/v1/class-sessions/ses-02-7/confirm-pending
+Authorization: Bearer {{token}}
+
+### 5. Edit a student's mark with a reason (rule 6.E). 400 for a blank reason, 422 STUDENT_NOT_ENROLLED
+PUT {{host}}/api/v1/class-sessions/ses-02-7/attendance/ch-u202310822
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "PRESENT", "reason": "El lector no registro su tarjeta" }
+
+### 6. Justify an absence
+POST {{host}}/api/v1/class-sessions/ses-02-7/attendance/ch-u202311233/justify
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "reason": "Certificado medico" }
+
+### 7. My own marks in my classes (arrival, departure, duration)
+GET {{host}}/api/v1/class-sessions/attendance/mine
+Authorization: Bearer {{token}}
+
+### 8. Meetings and trainings I am invited to
+GET {{host}}/api/v1/class-sessions/meetings/mine
+Authorization: Bearer {{token}}
+
+### 9. The admin cannot use these routes: 403 (sign in as admin and send the same request)

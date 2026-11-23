@@ -71,6 +71,13 @@ public class DeviceEventHandler {
   public void handle(TapReceived message) {
     if (taps.existsById(message.eventId())) {
       log.debug("Tap {} was already processed", message.eventId());
+      // The reader is told, but nothing is stored or resolved twice (AD13).
+      events.publishEvent(
+          new ReaderDisplayRequested(
+              message.readerId(),
+              message.eventId(),
+              "info",
+              DisplayMessages.lines(DisplayMessages.render("tap.duplicateEvent", Map.of()))));
       return;
     }
     CardTapEvent event =
@@ -83,7 +90,7 @@ public class DeviceEventHandler {
           IncidentType.CONFIGURATION_ERROR,
           "An unregistered reader (" + message.readerId() + ") sent a tap.",
           clock.now());
-      reject(event, "tap.readerOutOfService", "READER_NOT_REGISTERED");
+      reject(event, "tap.readerOutOfService", "READER_NOT_REGISTERED", null, null);
       return;
     }
     Reader reader = found.get();
@@ -93,19 +100,19 @@ public class DeviceEventHandler {
           IncidentType.READ_ERROR,
           "Reader " + reader.getId() + " sent a tap while " + reader.getStatus() + ".",
           clock.now());
-      reject(event, "tap.readerOutOfService", "READER_OUT_OF_SERVICE");
+      reject(event, "tap.readerOutOfService", "READER_OUT_OF_SERVICE", reader, null);
       return;
     }
     reader.seenAt(message.tappedAt());
 
     Optional<CardLookup> lookup = directory.findByCardUid(message.cardUid());
     if (lookup.isEmpty()) {
-      reject(event, "tap.cardNotRegistered", "CARD_NOT_REGISTERED");
+      reject(event, "tap.cardNotRegistered", "CARD_NOT_REGISTERED", reader, null);
       return;
     }
     CardLookup card = lookup.get();
     if (!card.active() || card.holder() == null) {
-      reject(event, "tap.cardInactive", "CARD_INACTIVE");
+      reject(event, "tap.cardInactive", "CARD_INACTIVE", reader, card);
       return;
     }
     directory.markUsed(card.credentialId(), message.tappedAt());
@@ -224,21 +231,29 @@ public class DeviceEventHandler {
   }
 
   /** Stores the event as REJECTED, announces it and answers on the reader's screen. */
-  private void reject(CardTapEvent event, String messageKey, String reason) {
+  private void reject(
+      CardTapEvent event, String messageKey, String reason, Reader reader, CardLookup card) {
     String text = DisplayMessages.render(messageKey, Map.of());
     event.resolve(TapOutcome.REJECTED, "error", messageKey, null, text);
     taps.save(event);
     events.publishEvent(
         new ReaderDisplayRequested(
             event.getReaderId(), event.getId(), "error", DisplayMessages.lines(text)));
-    events.publishEvent(
-        new IntegrationEvent(
-            "iot.tap-rejected",
-            Map.of(
-                "tapEventId", event.getId(),
-                "readerId", event.getReaderId(),
-                "cardUid", event.getCardUid(),
-                "tappedAt", event.getTappedAt().toString(),
-                "reason", reason)));
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("tapEventId", event.getId());
+    data.put("readerId", event.getReaderId());
+    data.put("cardUid", event.getCardUid());
+    data.put("tappedAt", event.getTappedAt().toString());
+    data.put("reason", reason);
+    if (reader != null) {
+      data.put("spaceId", reader.getSpaceId());
+    }
+    if (card != null) {
+      data.put("credentialId", card.credentialId());
+      if (card.holder() != null) {
+        data.put("cardHolderId", card.holder().id());
+      }
+    }
+    events.publishEvent(new IntegrationEvent("iot.tap-rejected", data));
   }
 }
