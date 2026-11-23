@@ -190,4 +190,4 @@ Request examples that run against any environment: `docs/http/iam.http`.
 ## Changelog
 
 - 2026-11-23 · First version: IAM and the simulated clock.
-- 2026-11-23 · Credentials section (cards, card holders, permissions, enrollment verification, settings, catalogues). Not frozen until verified on the deployed API.
+- 2026-11-23 · Credentials section (cards, card holders, permissions, enrollment verification, settings, catalogues), verified on the deployed API and **frozen**: from now on only additive changes, announced here.

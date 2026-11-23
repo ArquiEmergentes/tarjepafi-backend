@@ -38,10 +38,9 @@ Resource group: `rg-tarjepafi-demo`. Tag it `purpose=showcase` and `delete-after
 | Database | Neon project (direct host, `sslmode=require`) | not an Azure resource |
 
 Generated passwords are in `~/.tarjepafi-secrets.env` and the Neon values in `~/.tarjepafi-neon.env`, both outside the
-repository. Known gap until phase 3: the backend does not declare the `tarjepafi.devices` exchange yet, so after any
-broker (re)start the reader user is missing; declare the exchange by hand with
-`az container exec ... "su-exec rabbitmq rabbitmqadmin --username tarjepafi-backend --password <pass> declare exchange --name tarjepafi.devices --type topic"`
-and the entrypoint creates the user within seconds.
+repository. Since phase 3 the backend declares the `tarjepafi.devices` exchange itself, so after a broker (re)start the
+reader user appears within seconds once the backend has reconnected (open `/actuator/health` once to make it reconnect
+if nobody else is using it). Verified on 2026-11-23 by restarting the ACI container.
 
 ## What a person must do (an agent cannot)
 
