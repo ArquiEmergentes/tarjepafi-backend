@@ -26,7 +26,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=dev,demo
 |---|---|
 | http://localhost:8080/actuator/health | Health |
 | http://localhost:8080/swagger-ui.html | API documentation |
-| http://localhost:8080/api/v1 | API base path used by the web app |
+| http://localhost:8080/api/v1 | API base path (frontend guide: `docs/API.md`) |
 
 ## Profiles
 
