@@ -61,6 +61,8 @@ public class SecurityConfiguration {
                     .permitAll()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/simulation/clock")
                     .hasRole("ADMIN")
+                    .requestMatchers("/api/v1/credentials/**", "/api/v1/card-holders/**")
+                    .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated());
     return http.build();

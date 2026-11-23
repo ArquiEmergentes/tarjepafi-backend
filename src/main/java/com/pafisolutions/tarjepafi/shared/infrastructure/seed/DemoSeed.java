@@ -30,6 +30,12 @@ public class DemoSeed {
     }
   }
 
+  /** A single object of the data set, for example {@code settings}; null when it is absent. */
+  public JsonNode object(String name) {
+    JsonNode node = root.path(name);
+    return node.isObject() ? node : null;
+  }
+
   /** The rows of one collection, for example {@code users}. Empty when the collection is absent. */
   public Iterable<JsonNode> collection(String name) {
     JsonNode node = root.path(name);

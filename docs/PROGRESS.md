@@ -9,30 +9,39 @@ How to use this file:
 
 ## Current state
 
-- Date: 2026-11-22
+- Date: 2026-11-23
 - **Plan revision 4 (team decision of 2026-11-22): no web app work in this plan.** Another team member rebuilds the
   frontend from this backend and the Wokwi reader. Scope here: backend, firmware, deployment, and the API contract
   as a deliverable (plan D2, D13, D14, section 8). The web app steps of the checklist were replaced by contract steps.
 - **Phase 1 is done (milestone M1, 2026-11-16).** Its web app step 1.7 (commit `6b6add6` in `tarjepafi-webapp`) is
   kept only as a reference for the frontend owner.
-- **Phase 2 is deployed and verified on Azure (2026-11-23), except the API contract steps (2.5, 2.6).** Resource group
+- **Phase 2 is deployed and verified on Azure (2026-11-23).** Resource group
   `rg-tarjepafi-demo` (Chile Central), App Service B1 `asp-tarjepafi-demo`, backend `tarjepafi-api-pafi7k2`
   (`https://tarjepafi-api-pafi7k2.azurewebsites.net`), broker `aci-tarjepafi-broker`
   (`tarjepafi-broker-pafi7k2.chilecentral.azurecontainer.io`), Neon database. Images come from GHCR (public).
   Generated secrets live outside the repo, in `~/.tarjepafi-secrets.env`, and the Neon values in
   `~/.tarjepafi-neon.env`. CORS allows `http://localhost:4200` only until the frontend owner gives their origins.
 - **Azure CLI sessions expire** after 90 days idle: run `az login` again before any cloud step.
-- Git: `main` and `develop` exist; this file's latest version lives on `feature/chile-central-region` (one commit
-  ahead of `develop`, not merged), together with the revision 4 commit. Merge it into `develop` by PR.
+- Git: `main` and `develop` exist; the revision 4 plan and the phase 2 docs are merged into `develop` (PRs #2 and #3).
+  Phase 3 is on `feature/credentials-catalogues`, uncommitted.
 - Build: JDK 25 is installed and `mvn verify` is green on it, but `JAVA_HOME` may still point at JDK 24: set it to
   `C:\Program Files\Java\jdk-25.0.5.0.3` for Maven.
-- Phases 3 to 9 are not started. There is no firmware yet. `docs/API.md` and `docs/http/` do not exist yet.
+- **Phase 3 is implemented and tested locally, not deployed**: 70 tests green on JDK 25 (`mvn verify`, Docker needed).
+  Migrations `V3` to `V5`, the credentials, space and catalogue endpoints, the `CardHolderDirectoryPort`, integration events
+  after commit and the three exchanges declared by the backend (this also makes the broker create the reader user by itself).
+  `docs/API.md` has the credentials section and `docs/http/credentials.http` exists. Phases 4 to 9 are not started;
+  there is no firmware yet.
 
 ## Next step
 
-1. Phase 2 is done. Hand the frontend owner the deployed URL, Swagger UI and `docs/API.md`, and ask for their origins
-   (`CORS_ALLOWED_ORIGINS`). Merge `feature/chile-central-region` and `feature/api-contract-iam` into `develop` by PR.
-2. Start phase 3 (credentials and catalogues): declare the `tarjepafi.devices` exchange in the backend as part of it.
+1. Phase 3: commit, open the PR to `develop` (the person decides), merge, let CI publish the image, restart the App
+   Service app (`az webapp restart`), then run `docs/http/credentials.http` against the deployed API and tick 3.6 and
+   the Verify block. Freeze the credentials section of `docs/API.md` afterwards. The new tables are created by Flyway
+   on start; the demo seeder imports the cards on the first start. After the restart check the reader user exists
+   without the manual exchange step (the log line `reader user 'reader-demo' ready` on the broker).
+2. Hand the frontend owner the deployed URL, Swagger UI and `docs/API.md` (plan section 8) and ask for their origins
+   (`CORS_ALLOWED_ORIGINS`).
+3. Phase 4 (IoT: readers, messaging backbone, ingestion).
 
 ## Checklist
 
@@ -68,11 +77,11 @@ How to use this file:
 - [x] Verify block passed (2026-11-23: health, `iam.http` 11/11, CORS, `reader-demo` MQTT checks on ACI; the reader user needed the exchange declared by hand, see the log)
 
 ### Phase 3 · Credentials and catalogues
-- [ ] 3.1 Tables
-- [ ] 3.2 Domain
-- [ ] 3.3 Endpoints (US10, US11, US13, US14, US15)
-- [ ] 3.4 `CardHolderDirectoryPort` (TS29), events
-- [ ] 3.5 Catalogue read endpoints (spaces, courses, schedules, enrollments)
+- [x] 3.1 Tables (`V3` credentials, `V4` spaces, `V5` courses, schedules, enrollments; one active card per holder enforced by a partial unique index)
+- [x] 3.2 Domain (ported `credentials-domain.spec.ts`: 9 unit tests)
+- [x] 3.3 Endpoints (US10, US11, US13, US14, US15): 30 API tests against PostgreSQL and RabbitMQ containers
+- [x] 3.4 `CardHolderDirectoryPort` (TS29), events (`tarjepafi.events` after commit, 2 messaging tests; the backend now declares the three exchanges)
+- [x] 3.5 Catalogue read endpoints (spaces, courses, schedules, enrollments)
 - [ ] 3.6 Contract: Swagger, `docs/API.md`, `docs/http/credentials.http`; frozen after Verify
 - [ ] Verify block passed
 
@@ -239,3 +248,13 @@ How to use this file:
   with `rabbitmqadmin` inside the container. Until the backend declares it, a broker restart leaves no reader user.
   Signing in as `admin@upc.edu.pe` with the generated admin password gives 401 because the Neon database already held
   that user from the local test run (the seeder does not update existing users).
+- 2026-11-23 · Phase 3 written and tested locally. Decisions: spaces and the academic catalogues live in their own
+  contexts (`V4`, `V5`) and are read-only here; Credentials checks a space through `SpaceCatalog` (the facade of Space &
+  Facility) and Space keeps its roles as plain text so no context imports another's classes. One ACTIVE card per holder is
+  also enforced by a partial unique index. `block` needs a note, the other actions take an optional one. Reactivating a
+  card of a student with a pending enrollment is `422`, a second active card is `409`. Integration events are sent after
+  the transaction commits (`IntegrationEventForwarder`), so a rollback sends nothing and a broker outage does not undo a
+  change. The daily enrollment verification is `@Scheduled` at 00:05 campus time (`tarjepafi.credentials.enrollment-
+  verification.enabled=false` turns it off). Lessons: RabbitMQ 4 refuses transient non-exclusive queues (use exclusive
+  ones in tests); a null `String` parameter inside `lower(concat(...))` makes PostgreSQL type it as `bytea`, so search
+  patterns are built in Java; `Map.of` throws on `get(null)`. The old web app's `settings` is one object in `db.json`.
