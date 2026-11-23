@@ -12,7 +12,7 @@ showcase (about 24 hours) and then **everything is deleted** (see "Teardown").
  wokwi.com ──MQTT 1883──▶ RabbitMQ on ACI ◀──AMQP 5672── App Service B1 (backend container) ──▶ Neon PostgreSQL
                               (public IP + DNS label)      image from GitHub Container Registry
                                                                     ▲ HTTPS + JWT
-                                                           deployed web app (Static Web Apps)
+                                                           frontend (deployed by its owner)
 ```
 
 | Piece | Where | Why |
@@ -21,7 +21,7 @@ showcase (about 24 hours) and then **everything is deleted** (see "Teardown").
 | Broker | Azure Container Instances, image `ghcr.io/arquiemergentes/tarjepafi-rabbitmq` | Per-second billing, `az container stop` ends the bill. The image has the MQTT plugin and `mqtt.exchange` baked in. |
 | Backend | Azure App Service B1 (Linux container), image `ghcr.io/arquiemergentes/tarjepafi-backend` | HTTPS out of the box (ACI has none, and a browser blocks an HTTPS page calling plain HTTP). |
 | Images | GitHub Container Registry, **public** packages | Free, no pull credentials. They contain no secrets, but they do contain the demo seed (`db.json` with the documented demo passwords). |
-| Web app | Azure Static Web Apps, free plan | Decided in phase 2 step 4. |
+| Frontend | Not part of this plan (revision 4) | Built and hosted by another team member; only their origin goes into `CORS_ALLOWED_ORIGINS`. |
 
 Region: **Chile Central** (`chilecentral`), chosen by the team on 2026-11-16. App Service B1 and ACI list it as available;
 the subscription's quota there is still to be confirmed when the resources are created. The database is Neon, so the
@@ -34,7 +34,7 @@ Resource group: `rg-tarjepafi-demo`. Tag it `purpose=showcase` and `delete-after
    string. Do not paste it in the repository or in chat; it goes to the App Service settings.
 2. **GitHub**: after the first `ci` run on `develop`, open the two packages (`tarjepafi-backend`, `tarjepafi-rabbitmq`)
    under the organisation's Packages, link them to the repository and set the visibility to **public**.
-3. **GitHub repository settings** (only once the web app exists): variable `AZURE_WEBAPP_NAME`, secret
+3. **GitHub repository settings** (only once the backend's App Service app exists): variable `AZURE_WEBAPP_NAME`, secret
    `AZURE_WEBAPP_PUBLISH_PROFILE` (App Service, Download publish profile), environment `demo`.
 4. `az login` with the Azure for Students subscription (done by the team on 2026-11-16).
 
@@ -75,7 +75,7 @@ Backend app settings (names only; values come from Neon and the password manager
 | `DB_USERNAME`, `DB_PASSWORD` | from Neon |
 | `RABBITMQ_HOST` | the ACI DNS name above |
 | `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | `tarjepafi-backend` and `<backend-pass>` |
-| `CORS_ALLOWED_ORIGINS` | the web app's public origin (no trailing slash) |
+| `CORS_ALLOWED_ORIGINS` | the frontend owner's dev and deployed origins, comma-separated, no trailing slash |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | optional first administrator (TS01) |
 
 The reader user only appears once the backend has started and declared `tarjepafi.devices`: **start the backend before
@@ -87,7 +87,7 @@ The broker is stateless on purpose (no volume): a restart loses queued messages 
 ## Verify (phase 2 Verify block)
 
 - `https://tarjepafi-api-<suffix>.azurewebsites.net/actuator/health` is `UP` (it needs the broker running).
-- Sign-in works from the deployed web app.
+- `docs/http/iam.http` passes against the deployed API (sign-in, `auth/me`, 401, 403); a CORS preflight from a listed origin is accepted.
 - From any machine, with the `reader-demo` user: `mosquitto_pub` to `tarjepafi/readers/test/tap` and `mosquitto_sub` on
   `tarjepafi/readers/test/display` work; publishing to any other topic drops the connection; subscribing to `#` is denied;
   a wrong password is refused. (Same checks were run against the image locally on 2026-11-16.)

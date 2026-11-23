@@ -6,12 +6,17 @@ It is written so that any team member (or their coding agent) can pick up where 
 - **Progress and handoff notes live in [`PROGRESS.md`](PROGRESS.md).** Read it first, update it last.
 - Sources: the report (`tarjepafi-report/README.md`, sections 3.2, 3.4, 4.1, 5.x, 7.1) and the web app
   (`tarjepafi-webapp`, branch `feat/connection-tests`, folder `webapp/`).
-- When the report and the web app disagree: the web app's **domain model, resource field names and screens** win
-  (they are built and demoed); the report wins for the **API shape** (routes, commands, where rules run) and for
-  everything the web app does not implement. Section 3 lists the conflicts.
-- **Revision 2 (2026-11-15):** the team decided that the web app is refactored to fit the backend, not the other
-  way round. The json-server compatibility layer of revision 1 is dropped (see D2), and the target is a live
-  showcase: Wokwi in a browser → deployed backend → deployed web app (section 6).
+- When the report and the old web app disagree: the old web app's **domain model and resource field names** are
+  the default (they are built, seeded and demoed); the report wins for the **API shape** (routes, commands, where
+  rules run) and for everything the web app does not implement. Section 3 lists the conflicts.
+- **Revision 4 (2026-11-22, team decision): this plan no longer touches the web app.** A different team member
+  rebuilds the frontend from this backend's API and the Wokwi reader. This plan's scope is the **backend, the
+  firmware and the deployment**, and its deliverable to the frontend is a documented, deployed, frozen-per-phase API
+  contract (D14, section 8). The existing web app (`tarjepafi-webapp`) is now a **reference only**: its domain model,
+  seed data and rules are still the source to port from, but nothing in it is changed or kept working by this plan.
+- Earlier revisions: 1 (json-server compatibility layer) was dropped by revision 2 (web app refactored per context
+  by this plan), which revision 4 replaces. Revision 3 (2026-11-16) made the demo environment temporary and cheap.
+  The target is unchanged: Wokwi in a browser → deployed backend → deployed frontend (section 6).
 
 ---
 
@@ -24,7 +29,7 @@ It is written so that any team member (or their coding agent) can pick up where 
 | `tarjepafi-backend` | Empty repo (no commits). |
 | Firmware | Nothing. No repo exists in the organisation for it yet. |
 
-### How the web app talks to its API today (to be replaced context by context, see D2)
+### How the old web app talks to its API (historical; useful only to read its rules)
 
 - Base URL from `src/environments/environment.ts` → `http://localhost:3000/api/v1`.
 - One generic class, `shared/infrastructure/base-api-endpoint.ts`: `GET /{collection}`, `GET /{collection}/{id}`,
@@ -49,17 +54,18 @@ It is written so that any team member (or their coding agent) can pick up where 
 | # | Decision | Why |
 |---|---|---|
 | D1 | **Modular monolith**, one Spring Boot app, package per bounded context: `iam`, `credentials`, `academicattendance`, `spacefacility`, `iotmonitoring`, `datamanagement`, plus `shared`. | ADD iteration 1 of the report. Section 7.1.2 mentions "one repo per bounded context", but the ADD decision and the single existing repo say monolith. |
-| D2 | **Backend-first API; the web app is refactored to fit it** (team decision, revision 2). The backend exposes the report's task-oriented REST API (kebab-case routes, command endpoints, server-side rules). Each context phase ends with a web app branch that rewrites that context's `infrastructure/*api-endpoint*.ts` and `application/*.ts` against the new endpoints. To keep that refactor small, **JSON resource field names stay as in the web app's `*.resource.ts`** and application services keep their public signals and method names, so `presentation/` and `domain/` are untouched. No json-server compatibility layer is built. | Rules are implemented once, in Java. Presentation never injects an API endpoint directly (verified by grep), so the blast radius is `application/` + `infrastructure/`: about 3,250 of 9,200 lines. |
+| D2 | **Backend-first API; the frontend is built from it by another team member** (revision 4, replacing revision 2's per-context web app refactor). The backend exposes the report's task-oriented REST API (kebab-case routes, command endpoints, server-side rules). JSON field names stay camelCase and follow the old web app's `*.resource.ts` and the seed where a matching concept exists, because that model is already validated; there is no obligation to match its old json-server routes. | Rules are implemented once, in Java. The frontend owner gets one stable contract instead of tracking a moving refactor. |
 | D3 | **Tap rules must run server-side before the Wokwi reader is useful**, and the web simulator must then call the same pipeline. | A physical reader does not go through the browser. Two rule implementations (TS + Java) would drift. |
-| D4 | **JWT auth from the start; passwords never leave the server.** The web app gets a sign-in call and a bearer interceptor in phase 1. No endpoint ever returns `password`. | TS02–TS04, TS-CON05, QAS09. |
+| D4 | **JWT auth from the start; passwords never leave the server.** Clients send `Authorization: Bearer <token>` from `POST /auth/sign-in`. No endpoint ever returns `password`. | TS02–TS04, TS-CON05, QAS09. |
 | D5 | **Readers speak MQTT to RabbitMQ** (MQTT plugin). The backend only speaks AMQP. | TS-CON09 fixes RabbitMQ; 4.3.4 says "HTTPS/MQTT"; an ESP32 has mature MQTT clients and no practical AMQP 0-9-1 client. |
 | D6 | **A `credentials` module exists** even though chapter V has no such bounded context. It owns `card_holders`, `credentials`, status history and permissions, and implements `CardHolderDirectoryPort` (TS29) for the other contexts. | The web app already models it as a context, and US10/11/13/14/15 need an owner. |
 | D7 | **REST keeps local date-times (America/Lima, no offset); messages carry UTC instants.** Conversion happens in the ACL (`DevicePayloadAdapter`). | Web app compatibility vs. 7.1.3 messaging convention. |
 | D8 | **`CampusClock` port with two modes**: `system` (real time, production) and `simulated` (demo). In simulated mode the clock is settable through `/api/v1/simulation/clock`, and device timestamps are shifted by `simulatedNow − realNow`. | Seed sessions live in October 2026; a Wokwi reader stamps real time. Without this no demo tap ever hits a class in progress. |
 | D9 | **String ids generated by the server** (`VARCHAR` primary keys; reader ids such as `RDR-A-301` are chosen by the admin). Seed ids are kept as they are. `event_id` columns are `UNIQUE` (idempotency, AD13). | Seed data and reader ids are strings; firmware sends UUIDs. |
 | D10 | **Demo data = the web app's `server/db.json`**, imported by an idempotent seeder under the `demo` profile, with passwords BCrypt-hashed on import. | Same data as the deployed demo and the existing acceptance tests. |
-| D12 | **The showcase runs entirely on public infrastructure**: backend, PostgreSQL, RabbitMQ (MQTT reachable from the internet) and web app are deployed; the reader is a saved public project on wokwi.com. Deployment is therefore phase 2, not the last phase, and every later phase is redeployed. | Wokwi's free browser simulator only reaches the internet (`Wokwi-GUEST`), never a laptop. Deploying early removes the biggest demo risk. |
-| D13 | **Live views poll** (2 s) while visible: reader detail, session detail, access records, dashboard, simulator log. SSE can replace polling later without changing the screens. | A Wokwi tap must show up in the web app without a manual reload; polling needs no extra infrastructure and works with the bearer interceptor. |
+| D12 | **The showcase runs entirely on public infrastructure**: backend, PostgreSQL and RabbitMQ (MQTT reachable from the internet) are deployed by this plan; the frontend is deployed by its owner; the reader is a saved public project on wokwi.com. Deployment is therefore phase 2, not the last phase, and every later phase is redeployed. | Wokwi's free browser simulator only reaches the internet (`Wokwi-GUEST`), never a laptop. Deploying early removes the biggest demo risk and gives the frontend a live API to build against. |
+| D13 | **Live data is polling-friendly; push is optional.** Every list a live screen would watch (tap events, access records, attendance of a session, reader status, incidents) accepts `after=<cursor>` (or `since=<date-time>`) and returns newest-first with a `nextCursor`, so a 2 s poll is cheap. An SSE stream (`GET /api/v1/stream`) is added only if the frontend owner asks for it (phase 9). | A Wokwi tap must reach the screen without a reload; polling needs no extra infrastructure and works with the bearer token. |
+| D14 | **The API contract is a deliverable.** Each phase ends with its endpoints described in Swagger (summaries, examples, every error `code`), in `docs/API.md` (frontend guide: auth, conventions, roles per route, error codes, changelog) and in `docs/http/<context>.http` request files that the Verify block runs. Once a phase is verified on the deployed API its contract is **frozen**: later changes are additive, or announced in the `docs/API.md` changelog and told to the frontend owner. | Lets the frontend start context by context instead of waiting for the finished backend (R3). |
 | D11 | Firmware lives in `firmware/reader-esp32/` inside this repo until the organisation creates a dedicated repo. | Nothing to push it to yet; keeps the handoff in one place. |
 
 ### Stack
@@ -71,7 +77,7 @@ It is written so that any team member (or their coding agent) can pick up where 
 | Messaging | RabbitMQ 4 with `rabbitmq_mqtt` and `rabbitmq_management`, Spring AMQP |
 | Security | Spring Security, BCrypt, JWT (HS256, secret from env) |
 | Docs | springdoc-openapi (Swagger UI) |
-| Tests | JUnit 5, Mockito, Testcontainers (PostgreSQL, RabbitMQ), the web app's Playwright-BDD `@integration` features as contract tests |
+| Tests | JUnit 5, Mockito, Testcontainers (PostgreSQL, RabbitMQ), MockMvc API tests, `docs/http/*.http` request files against the deployed API |
 | Firmware | C++ / Arduino framework, ESP32 DevKit, PlatformIO project that also runs in Wokwi |
 | Local infra | Docker Compose |
 | Deploy | Azure App Service B1 (backend container from GitHub Container Registry) + Neon free PostgreSQL + RabbitMQ on Azure Container Instances (revision 3, see phase 2) |
@@ -83,7 +89,7 @@ It is written so that any team member (or their coding agent) can pick up where 
 | JDK 25 | Installed (2026-11-16) and first on `PATH`; `JAVA_HOME` may still point at JDK 24, so set it for Maven. `mvn verify` is green on it. |
 | Maven 3.9 | Installed |
 | Docker Desktop | Installed, daemon was stopped |
-| Node 20.19+ / npm | Installed (web app and contract tests) |
+| Node 20.19+ / npm | Optional: only to run the old web app as a reference |
 | Wokwi | VS Code extension (needs a free licence) or wokwi.com. See section 6 for the networking caveat. |
 | PlatformIO (optional) | Missing; only needed to build the firmware outside wokwi.com |
 
@@ -110,7 +116,7 @@ It is written so that any team member (or their coding agent) can pick up where 
  Wokwi ESP32 reader ──MQTT──▶ RabbitMQ ──AMQP──▶ Spring Boot (modular monolith) ──JDBC──▶ PostgreSQL
         ▲                        │                       ▲
         └──── MQTT display ◀─────┘                       │ REST + JWT
-                                                   Angular web app
+                                       frontend (built separately, section 8)
 ```
 
 ### Messaging topology
@@ -198,26 +204,29 @@ Legend for "Web app today": **UI+rules** = implemented client-side; **UI gap** =
 ### What the demo must show
 
 A presenter opens the saved Wokwi project in a browser, presses play, presents a card to the simulated reader, and
-the audience sees the result in the **deployed** web app within a couple of seconds, plus the reply on the
+the audience sees the result in the **deployed frontend** within a couple of seconds, plus the reply on the
 reader's LCD.
 
 ```
  wokwi.com (browser) ──MQTT over the internet──▶ RabbitMQ (public MQTT port) ──AMQP──▶ backend (Azure) ──▶ PostgreSQL
         ▲                                             │                                   ▲
-        └──────────── display reply (MQTT) ◀──────────┘                                   │ REST + JWT, polled every 2 s
-                                                                               deployed web app (browser)
+        └──────────── display reply (MQTT) ◀──────────┘                                   │ REST + JWT (polling, D13)
+                                                                        frontend (built and deployed by its owner)
 ```
 
-Demo script (the acceptance test of milestone M3):
+Demo script. Each step names the API read that proves it; the frontend must show the same data. This plan's
+milestone **M3** is the script passing with the API reads (Swagger UI or `docs/http/demo.http`); the full showcase
+(**M4**) is the same script with the frontend's screens and depends on the frontend owner.
 
-1. Web app, admin: reader `RDR-A-301` shows `ACTIVE` with a recent "last seen" once the Wokwi reader is running.
-2. Web app, admin: set the campus clock to Wed 2026-10-07 10:00 (class in progress in A-301).
-3. Wokwi: teacher card → LCD "Clase iniciada"; web app session detail shows the session `IN_PROGRESS`.
-4. Wokwi: student card → LCD "Asistencia tomada"; the attendance row appears in the teacher's session detail.
-5. Wokwi: blocked card → red LED and "Tarjeta bloqueada"; the rejected tap appears in the reader's event log.
-6. Wokwi: offline switch on, two taps ("Guardado sin conexion"), switch off → both appear with their original time.
-7. Fallback if Wokwi or the venue network fails: the web app's simulator screen sends the same taps through
-   `POST /iot/readers/{id}/taps`, which enters the same pipeline.
+| # | Action | Reader shows | Proof in the API |
+|---|---|---|---|
+| 1 | Start the Wokwi project | idle screen | `GET /iot/readers/RDR-A-301`: `ACTIVE`, recent `lastSeenAt` |
+| 2 | Admin sets the campus clock to Wed 2026-10-07 10:00 | — | `PUT /simulation/clock` → 200 |
+| 3 | Teacher card | "Clase iniciada" | the class session of A-301 is `IN_PROGRESS` |
+| 4 | Student card | "Asistencia tomada" | the student's attendance record exists for that session |
+| 5 | Blocked card | red LED, "Tarjeta bloqueada" | the tap event is `REJECTED` with that message |
+| 6 | Offline switch on, two taps, switch off | "Guardado sin conexion" | both tap events appear, `buffered: true`, original times |
+| 7 | Fallback if Wokwi or the network fails | — | `POST /iot/readers/{id}/taps` (Swagger, `docs/http/demo.http`, or a simulator screen if the frontend builds one) enters the same pipeline |
 
 ### Wokwi constraints
 
@@ -240,7 +249,7 @@ Demo script (the acceptance test of milestone M3):
   gets an overlay that registers the Wokwi tag UIDs as credentials of the demo holders (student `U202312966`,
   teacher `D0001`, staff `T0001`, one blocked card, one unregistered).
 - **Time.** The reader stamps real UTC time from NTP; the deployed backend runs with the simulated campus clock
-  (D8), which maps device time onto campus time. The presenter moves the clock from the web app.
+  (D8), which maps device time onto campus time. The presenter moves the clock from the frontend (or Swagger UI).
 - **Offline.** Wokwi cannot drop Wi-Fi on demand, so the circuit has a slide switch that forces offline mode
   (TS-CON06).
 - **Start-up time.** The free simulator compiles in a shared queue. Open the project and press play before the
@@ -259,40 +268,39 @@ From phase 1 on, every phase has the same shape:
 - **Backend:** Flyway migration for the context's tables (snake_case, plural, `pk_/fk_/uk_/idx_`, no foreign keys
   across contexts) → domain → application services → REST controllers → seed import of that context's collections
   from `src/main/resources/seed/db.json` (copy of the web app's `server/db.json`, D10) → tests.
-- **Web app** (branch `feature/backend-<context>` off `feat/connection-tests` in `tarjepafi-webapp`): rewrite the context's
-  `infrastructure/*api-endpoint*.ts` and `application/*.ts` against the new endpoints. Keep the public signals and
-  method names of each store/service so `presentation/` compiles unchanged. Delete the rule code that moved
-  server-side and keep `domain/` only for what forms and labels need. Update or replace the affected e2e features.
-- **Redeploy** both (from phase 2 on) and run the phase's Verify block against the deployed environment too.
+- **Contract (D14):** Swagger annotations with examples and error codes, the context's section in `docs/API.md`,
+  and `docs/http/<context>.http` with the requests the Verify block uses. Read endpoints a live screen would watch
+  are polling-friendly (D13).
+- **Redeploy** (from phase 2 on), run the phase's Verify block against the deployed API, then mark the context's
+  contract as frozen in `docs/API.md` and tell the frontend owner.
+- No web app changes (revision 4).
 
-Rules are ported from the TypeScript file named in each phase, together with its unit tests.
+Rules are ported from the old web app's TypeScript file named in each phase, together with its unit tests.
 
 ### Phase 0 · Foundations (done, see `PROGRESS.md`)
 
 Maven project, package skeleton, `compose.yaml`, profiles, Flyway baseline, actuator, springdoc, CORS, security
 baseline, `CampusClock` and `/api/v1/simulation/clock`. Step 0.1 (first commit and branches) is still open.
 
-### Phase 1 · IAM and web app sign-in
+### Phase 1 · IAM and sign-in (done)
 
 1. `iam`: `users` table, `User` aggregate, `EmailAddress` value object (`@upc.edu.pe` only), statuses
    `ACTIVE/INACTIVE/SUSPENDED`, roles `ADMIN/TEACHER/STUDENT/STAFF`.
 2. Shared `ProblemDetail` error handler (`@RestControllerAdvice`): 400 validation, 404, 409, 422 business rule,
-   each with a stable `code` the web app can map to an i18n key.
+   each with a stable `code` the frontend can map to a translated message.
 3. TS01 `AdminDataSeeder` (account from env, BCrypt, skip if the e-mail exists). `DemoDataSeeder` (`demo` profile)
    imports `users` from the seed file and BCrypt-hashes the passwords.
 4. TS02 `POST /api/v1/auth/sign-in` → 200 `{ token, user }`; 400 invalid e-mail; 401 wrong credentials (no hint
    which field); 403 disabled account (`code` says `INACTIVE` or `SUSPENDED`).
 5. TS03 `JwtAuthenticationFilter`, 401 vs 403, method security. TS04 `GET /api/v1/auth/me`.
 6. Replace the `open-api` profile switch with real role rules as endpoints appear; keep it only if a test needs it.
-7. **Web app** `feature/backend-auth`: `environment.ts` → backend URL; `UsersApiEndpoint.verifyCredentials` →
-   `POST auth/sign-in`; token stored with the session in `auth.store.ts`; functional interceptor adding
-   `Authorization: Bearer`, signing out on 401; map 403 → `ACCOUNT_DISABLED`, 401 → `INVALID_CREDENTIALS`.
-   The other contexts keep pointing at json-server until their phase (two base URLs in `environment.ts`:
-   `apiBaseUrl` for migrated contexts, `legacyApiBaseUrl` for the rest; remove the second one in phase 7).
+7. Done on 2026-11-16 under revision 2 and **no longer maintained**: the old web app's sign-in adapter (commit
+   `6b6add6` in `tarjepafi-webapp`, branch `feature/backend-auth`). It stays as a working reference of the sign-in
+   flow for the frontend owner.
 
 **Verify:** the seven demo users of the web app README behave as documented (admin, teacher, student, staff,
 INACTIVE, SUSPENDED, non-institutional e-mail); a request without token gets 401; a teacher token on an
-admin-only route gets 403. **Milestone M1: the web app signs in against the real backend.**
+admin-only route gets 403. **Milestone M1** (reached 2026-11-16).
 
 ### Phase 2 · Demo environment (first deployment)
 
@@ -316,17 +324,21 @@ blocked small VMs.
 
 1. Multi-stage `Dockerfile`; GitHub Actions workflow (`.github/workflows/ci.yml`): build and test on every pull
    request, images pushed on `develop`/`main`, deploy to App Service on `develop` once `AZURE_WEBAPP_NAME` is set.
-2. Resource group `rg-tarjepafi-demo` with the App Service plan and web app, and the ACI broker (ports 5672 and 1883
+2. Resource group `rg-tarjepafi-demo` with the App Service plan and the backend's App Service app, and the ACI broker (ports 5672 and 1883
    public, 15672 not published). Neon project created by a person. Secrets as app settings; HTTPS only; profile `demo`
    on the showcase environment. The exact commands are in `docs/DEPLOYMENT.md`.
 3. Broker users: `tarjepafi-backend` (AMQP, administrator, from `RABBITMQ_DEFAULT_USER`) and `reader-demo` (MQTT,
    restricted as in section 6), created by the image's entrypoint **after the backend has declared the
    `tarjepafi.devices` exchange** (RabbitMQ only accepts topic permissions on an existing exchange).
-4. Web app: `environment.prod.ts` → deployed API; add the web app's public origin to `CORS_ALLOWED_ORIGINS`.
-   Hosting: Azure Static Web Apps (free plan), pending the team's confirmation.
-5. Document every resource name, URL and setting (not the secrets) and the teardown in `docs/DEPLOYMENT.md`.
+4. CORS: `CORS_ALLOWED_ORIGINS` lists the frontend owner's development origin and, once it exists, their deployed
+   origin (comma-separated, no trailing slash). Frontend hosting is the frontend owner's decision.
+5. Start `docs/API.md` (base URL of the deployed API, Swagger link, demo accounts, auth flow, conventions: camelCase,
+   string ids, local date-times without offset, problem documents with `code`) and `docs/http/iam.http`. Hand both to
+   the frontend owner together with the deployed URL.
+6. Document every resource name, URL and setting (not the secrets) and the teardown in `docs/DEPLOYMENT.md`.
 
-**Verify:** deployed `/actuator/health` is `UP`; sign-in works from the deployed web app; from any machine,
+**Verify:** deployed `/actuator/health` is `UP`; `docs/http/iam.http` passes against the deployed API over HTTPS
+(sign-in, `auth/me`, 401, 403); a CORS preflight from the listed origin is accepted; from any machine,
 `mosquitto_pub`/`mosquitto_sub` with the `reader-demo` user can publish and read `tarjepafi/readers/test/tap`,
 and cannot touch any other exchange.
 
@@ -346,12 +358,11 @@ Port from `credentials.store.ts`, `credential-directory.service.ts`, `enrollment
    the other contexts. Publish `credentials.*` events (the exchange is declared here, used from phase 4).
 5. Read-only catalogues the screens already need: `GET /api/v1/spaces` (table `spaces`, owned by `spacefacility`)
    and `GET /api/v1/courses`, `/class-schedules`, `/enrollments` (owned by `academicattendance`).
-6. **Web app** `feature/backend-credentials`: the four credential endpoint classes, `credentials.store.ts`,
-   `credential-directory.service.ts`, `enrollment-verification.service.ts`, `space-catalog.service.ts`,
-   `academic-catalog.service.ts`.
+6. **Contract:** Swagger, `docs/API.md` section and `docs/http/credentials.http` (D14).
 
-**Verify:** rows US10, US11, US13, US14, US15 of the traceability table in `webapp/README.md` section 7, done in
-the web app against the backend; acceptance features `05` and `06` green.
+**Verify:** the US10, US11, US13, US14 and US15 scenarios (report acceptance criteria; the old web app's
+acceptance features `05` and `06` list them) pass as API tests and through `docs/http/credentials.http` against the
+deployed API.
 
 ### Phase 4 · IoT: readers, messaging backbone, ingestion
 
@@ -373,11 +384,11 @@ Port from `readers.store.ts` and `iot-monitoring/domain`.
 7. `iot.tap-resolved.queue` consumer: stores outcome, `messageKey`, `messageParams`, `tone`, `displayMessage`;
    publishes the display reply to `tarjepafi.devices`.
 8. Until phase 5 exists, a temporary fallback resolver answers every valid tap with `tap.received`.
-9. **Web app** `feature/backend-iot`: IoT endpoint classes, `readers.store.ts`, `tap-events.query.ts`,
-   `iot-notifications.ts`; polling on reader detail (D13).
+9. **Contract:** Swagger, `docs/API.md` section and `docs/http/iot.http` (D14). Tap events, incidents and
+   reader status are polling-friendly (D13).
 
-**Verify:** `mosquitto_pub` with a v1 tap payload against the **deployed** broker creates one tap event visible in
-the deployed web app's reader detail without reloading; publishing it twice still yields one; a malformed payload
+**Verify:** `mosquitto_pub` with a v1 tap payload against the **deployed** broker creates one tap event returned by
+`GET /iot/readers/{id}/tap-events` of the deployed API (and by the `after` cursor of the previous poll); publishing it twice still yields one; a malformed payload
 lands in the DLQ; an unregistered reader produces an incident; `mosquitto_sub` on `…/display` sees the reply.
 
 ### Phase 5 · Tap resolution: attendance and access
@@ -400,14 +411,13 @@ Port, test by test, from `nfc-simulator.service.ts#resolve`, `attendance-tap.ser
    iteration 6); endpoints TS18, TS19, TS28, TS30 (`/api/v1/spaces/**`, `/api/v1/access-records`,
    `/api/v1/work-shifts`).
 5. Remove the phase 4 fallback resolver.
-6. **Web app** `feature/backend-taps`: `nfc-simulator.service.ts` shrinks to `POST /iot/readers/{id}/taps`
-   ("Pasar tarjeta" and "Reenviar"); delete `attendance-tap.service.ts`, `access-control.service.ts`,
-   `session-closing.service.ts`; `teacher-workspace.service.ts`, `attendance-overview.service.ts`,
-   `attendance-ledger.service.ts`, `access-records.query.ts` call the new endpoints; `simulated-clock.service.ts`
-   reads and sets `/simulation/clock` instead of `localStorage`; polling on session detail and access records.
+6. **Contract:** Swagger, `docs/API.md` section and `docs/http/attendance.http` and `docs/http/space-facility.http` (D14).
+   Add `docs/http/demo.http`: the demo script of section 6 as requests (clock, injected taps, reads). Session
+   attendance and access records are polling-friendly (D13).
 
-**Verify:** the demo walkthrough of `webapp/README.md` section 4 works from the web simulator against the deployed
-backend; acceptance features `01`–`04` and `07` green; a duplicate event answers "Evento ya procesado".
+**Verify:** the old web app's demo walkthrough (its README section 4), replayed through `docs/http/demo.http` against
+the deployed API, gives the same outcomes; the scenarios of the old acceptance features `01`–`04` and `07` pass as API
+tests; a duplicate event answers "Evento ya procesado".
 **Milestone M2: taps are resolved server-side, end to end.**
 
 ### Phase 6 · Wokwi firmware and the live showcase
@@ -431,9 +441,11 @@ meaningful replies.
 7. Save the project on wokwi.com with the `reader-demo` broker settings; put its URL in `docs/DEPLOYMENT.md` and in
    the firmware README.
 8. Rehearse the demo script of section 6 twice from a machine that has never run the project.
+9. Hand the Wokwi URL and the tag-to-holder table to the frontend owner.
 
-**Verify:** the seven steps of the demo script, on the deployed environment, from the public Wokwi URL.
-**Milestone M3: the showcase works.**
+**Verify:** the seven steps of the demo script, on the deployed environment, from the public Wokwi URL, each proved
+by its API read. **Milestone M3: the reader-to-backend showcase works.** M4 (with the frontend) is rehearsed together
+with the frontend owner.
 
 ### Phase 7 · Data Management
 
@@ -443,18 +455,16 @@ Port from `data-recorder.service.ts`, `dashboard.query.ts`, `reports.store.ts`, 
    `event_id`, coherence check of `sourceContext`/`dataType` → `DataRegistrationError`.
 2. TS25 query endpoints and dashboard aggregates; TS26 `POST /api/v1/reports/{weekly|monthly|semester}` → 202 +
    async consolidation; TS27 report list and detail.
-3. **Web app** `feature/backend-data`: delete `data-recorder.service.ts` and the client-side calculation;
-   `dashboard.query.ts` and `reports.store.ts` call the endpoints (report detail polls while `GENERATING`);
-   polling on the dashboard. Remove json-server, `server/`, `legacyApiBaseUrl` and `id-generator.ts`.
+3. **Contract:** Swagger, `docs/API.md` section and `docs/http/data-management.http` (D14). Report status is
+   polling-friendly while `GENERATING`.
 
-**Verify:** a weekly report for 5–11 Oct 2026 has the same summary the web app computed client-side (capture it
-before deleting the calculator); one data record per fact, no duplicates after replaying a queue; the web app
-runs with json-server stopped.
+**Verify:** a weekly report for 5–11 Oct 2026 has the same summary the old web app computes client-side (run it once
+on json-server to capture the expected numbers); one data record per fact, no duplicates after replaying a queue.
 
 ### Phase 8 · Reservations (Sprint 2 scope)
 
 TS20, TS21, TS22 (check-in), TS23 `ReservationToleranceScheduler` every minute, e-mail port with an async SMTP
-adapter (TS-CON07), `STUDY_CUBICLE` readers. Needs new web app screens (US03, US28).
+adapter (TS-CON07), `STUDY_CUBICLE` readers. Screens for US03 and US28 belong to the frontend owner; this plan delivers the endpoints and their contract.
 
 **Verify:** a `CONFIRMED` reservation without check-in becomes `FORFEITED` after 10 minutes (simulated clock) and
 an e-mail is captured by the local mail catcher; a tap inside the window moves it to `CHECKED_IN`.
@@ -467,27 +477,26 @@ an e-mail is captured by the local mail catcher; a tap inside the window moves i
 
 ---
 
-## 8. Web app refactor: size and rules
+## 8. Frontend handoff
 
-Measured on the web app (non-test TypeScript under `src/app`):
+The frontend is built by another team member from this backend (revision 4). What this plan owes them, and when:
 
-| Layer | Files | Lines | What happens |
-|---|---|---|---|
-| `presentation/` | 51 | 4,472 | Untouched, except a polling hook in five views (D13). It only injects application services. |
-| `domain/` | 23 | 1,485 | Mostly untouched: entities, enums and form validation stay. Rule methods that only the deleted services used can go. |
-| `application/` | 27 | 2,444 | Rewritten. Roughly 1,000 lines of rules are deleted (tap resolution, access control, session closing, data recorder, enrollment check, report calculation); the stores keep their signals and call command endpoints. |
-| `infrastructure/` | 27 | 806 | Endpoint classes re-pointed to the new routes; resources and assemblers stay (same field names, D2). |
+| When | They get |
+|---|---|
+| Phase 2 verified | Deployed API base URL, Swagger UI, `docs/API.md` (conventions, auth, error codes), demo accounts, `docs/http/iam.http`. Enough to build sign-in and the app shell. |
+| Each later phase verified | That context's endpoints frozen (D14): credentials (3), readers and tap events (4), sessions, attendance, access records, work shifts, campus clock (5), data and reports (7), reservations (8). |
+| Phase 6 verified | The public Wokwi URL, the tag-to-holder table and the demo script, so they can test live updates with a real reader. |
 
-Rules of the refactor:
+What this plan needs from them: their development and deployed origins (for `CORS_ALLOWED_ORIGINS`), early feedback
+on each contract before it is frozen, and their deployment date before the showcase.
 
-1. One web app branch per backend phase; the app must work at the end of each (migrated contexts on the backend,
-   the rest still on json-server through `legacyApiBaseUrl`).
-2. Never change a signal or method name that `presentation/` uses. If a screen must change, say so in the PR.
-3. A rule is deleted from the web app only in the same PR that switches it to the server.
-4. Backend error `code`s map to the existing i18n keys; do not add user-facing text in the backend except the
-   reader display lines.
-5. The Playwright `@integration` features describe the json-server contract and are retired; the acceptance
-   features (`01`–`07`) are the regression suite and must stay green after each phase.
+Conventions the frontend can rely on (detailed in `docs/API.md`): base path `/api/v1`; `Authorization: Bearer`; JSON
+camelCase; string ids; date-times in campus local time without offset (`2026-10-07T10:00:00`); errors as RFC 9457
+problem documents with a stable `code`; live lists polling-friendly (D13); the campus clock readable by anyone
+signed in and movable by admins (`/simulation/clock`, demo profile only).
+
+References they may reuse but this plan does not maintain: the old web app (`tarjepafi-webapp`, `feat/connection-tests`)
+for screens, domain model and Spanish texts (`public/i18n/es.json`), and its sign-in adapter (commit `6b6add6`).
 
 ---
 
@@ -497,9 +506,9 @@ Rules of the refactor:
 |---|---|---|
 | R1 | JDK 25 was missing on the first dev machine. | **Resolved 2026-11-16:** installed; `mvn verify` green on it. Use JDK 25 in the CI image (phase 2). |
 | R2 | Public MQTT broker for the showcase. | **Decided 2026-11-16:** RabbitMQ on Azure Container Instances (stopped between sessions), paid with the Azure for Students credit (phase 2, revision 3). |
-| R3 | Between phases 1 and 7 the web app talks to two APIs (backend + json-server), so the deployed web app is only fully functional for migrated contexts. | Accepted; the showcase needs phases 1–6. |
+| R3 | The full showcase (M4) depends on a frontend that another team member builds after the backend. | Freeze each context's contract as soon as its phase is deployed (D14) so frontend work starts per context; agree the frontend's deployment date; M3 (reader + API) is demonstrable on its own. |
 | R4 | Wokwi tag UIDs differ from seed UIDs. | Resolved by the seed overlay in phase 6. |
-| R5 | The web app's `develop` reverted the test suite; `feat/connection-tests` has it (same tree as `feat/sprint1-fase7-testing-suite`). | **Decided 2026-11-15:** every web app branch of this plan starts from `feat/connection-tests` and is merged back into it. |
+| R5 | Web app base branch. | **Superseded 2026-11-22:** this plan makes no web app changes. |
 | R6 | Firmware has no repository in the organisation. | Create `tarjepafi-iot-firmware` or keep it in this repo (D11). |
 | R7 | Broker credentials are readable in a public Wokwi project. | Restricted `reader-demo` user, rotated after each showcase (section 6). |
-| R8 | The showcase depends on wokwi.com and the venue network. | Web simulator fallback (demo script step 7) and a recorded run as backup. |
+| R8 | The showcase depends on wokwi.com and the venue network. | Injected taps through `POST /iot/readers/{id}/taps` (demo script step 7) and a recorded run as backup. |

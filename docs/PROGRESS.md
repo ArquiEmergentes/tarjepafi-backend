@@ -9,36 +9,34 @@ How to use this file:
 
 ## Current state
 
-- Date: 2026-11-16
-- **Phase 1 is done (milestone M1)**: the web app signs in against the real backend (see the log).
-- **Phase 2 is in progress; nothing exists in Azure yet.** Work is on `feature/demo-environment` (off `develop`,
-  uncommitted). Decisions of 2026-11-16 (plan revision 3): Neon free PostgreSQL, RabbitMQ on Azure Container Instances,
-  backend on App Service B1, images on GitHub Container Registry, everything temporary and deleted after the
-  showcase. Written and verified **locally**: `Dockerfile` (image runs, health UP, sign-in 200, non-root, about 300 MiB),
-  `docker/rabbitmq/` image with the restricted `reader-demo` user (permissions tested with real MQTT clients),
-  Hikari settings for a serverless database, `mvn verify` (29 tests) on JDK 25. Written but **not run anywhere**:
-  `.github/workflows/ci.yml` (YAML parses, never executed on GitHub) and the commands in `docs/DEPLOYMENT.md`.
-- Azure: logged in (`az login`, Azure for Students, 2026-11-16); no resource created; `Microsoft.ContainerInstance`
-  is not registered yet. Region: Chile Central (decided 2026-11-16); the Neon project exists; the web app goes on Azure Static Web Apps.
-  ACI lists Chile Central; the GHCR packages are public (anonymous pull 200).
-  Verified locally on 2026-11-16: the published images against the real Neon project (Flyway 2 migrations, health UP,
-  sign-in 200/401, sign-in after >5 min idle 1.2 s). Still undeployed on Azure.
-- Git: `main` and `develop` exist. The web app's step 1.7 is commit `6b6add6` on `feat/sprint1-fase7-testing-suite`
-  (pushed); the local branch `feature/backend-auth` points at it.
-- Build: JDK 25 is installed and `mvn verify` is green on it, but `JAVA_HOME` still points at JDK 24: set it to
+- Date: 2026-11-22
+- **Plan revision 4 (team decision of 2026-11-22): no web app work in this plan.** Another team member rebuilds the
+  frontend from this backend and the Wokwi reader. Scope here: backend, firmware, deployment, and the API contract
+  as a deliverable (plan D2, D13, D14, section 8). The web app steps of the checklist were replaced by contract steps.
+- **Phase 1 is done (milestone M1, 2026-11-16).** Its web app step 1.7 (commit `6b6add6` in `tarjepafi-webapp`) is
+  kept only as a reference for the frontend owner.
+- **Phase 2 is in progress; nothing exists in Azure.** Written and verified locally: `Dockerfile`, the broker image
+  with the restricted `reader-demo` user, the published GHCR images against the real Neon project. CI ran green on
+  GitHub (per the earlier note in "Next step"). Region Chile Central, Neon project created, resource group not created.
+  `Microsoft.ContainerInstance` not registered yet.
+- **The Azure CLI login has expired** (refresh token inactive for 90 days, seen 2026-11-22): run `az login` again
+  before any cloud step.
+- Git: `main` and `develop` exist; this file's latest version lives on `feature/chile-central-region` (one commit
+  ahead of `develop`, not merged), together with the revision 4 commit. Merge it into `develop` by PR.
+- Build: JDK 25 is installed and `mvn verify` is green on it, but `JAVA_HOME` may still point at JDK 24: set it to
   `C:\Program Files\Java\jdk-25.0.5.0.3` for Maven.
-- Phases 3 to 9 are not started. There is no firmware yet. Nothing is deployed.
+- Phases 3 to 9 are not started. There is no firmware yet. `docs/API.md` and `docs/http/` do not exist yet.
 
 ## Next step
 
-1. A person must: make the two GHCR packages public (CI already ran green on GitHub; see "What a person must do" in
-   `docs/DEPLOYMENT.md`). Region and Neon are settled.
-2. Create the Azure resources in the order of `docs/DEPLOYMENT.md` (resource group, App Service plan and web app,
-   ACI broker), asking the person before each paid resource. Then run the phase 2 Verify block against the deployed
-   environment, tick 2.1 to 2.3 and 2.5, and fill the real names into `DEPLOYMENT.md`.
-3. Step 2.4 (web app production config, Static Web Apps, CORS) needs the web app repository: branch off
-   `feat/connection-tests`.
-4. If the cloud steps are blocked, phase 3 needs no cloud and can be done first (come back before phase 4 is verified).
+1. A person: `az login` again (Azure for Students); confirm the two GHCR packages are public (the earlier notes
+   disagree: "Current state" said anonymous pull 200, "Next step" still asked for it).
+2. Phase 2: create the Azure resources in the order of `docs/DEPLOYMENT.md`, asking the person before each paid
+   resource; then step 2.4 (CORS with the frontend owner's origins: ask the person for them) and step 2.5 (start
+   `docs/API.md` and `docs/http/iam.http`); run the phase 2 Verify block against the deployed API.
+3. Give the frontend owner the deployed URL, Swagger UI and `docs/API.md` as soon as phase 2 is verified (plan
+   section 8).
+4. If the cloud steps are blocked, do phase 3 first (no cloud needed) and come back before phase 4 is verified.
 
 ## Checklist
 
@@ -61,15 +59,16 @@ How to use this file:
 - [x] 1.4 `POST /auth/sign-in` (TS02)
 - [x] 1.5 JWT filter, `GET /auth/me` (TS03, TS04)
 - [x] 1.6 Role rules replace the `open-api` switch
-- [x] 1.7 Web app `feature/backend-auth`
+- [x] 1.7 Web app `feature/backend-auth` (done under revision 2; reference only since revision 4)
 - [x] Verify block passed (milestone M1, 2026-11-16)
 
 ### Phase 2 · Demo environment (first deployment)
 - [ ] 2.1 Dockerfile and CI (Dockerfile verified locally; workflow not yet run on GitHub)
 - [ ] 2.2 Azure resources (App Service, PostgreSQL, broker)
 - [ ] 2.3 Broker users (`tarjepafi-backend`, restricted `reader-demo`) (verified locally on the image; not yet on ACI)
-- [ ] 2.4 Web app production config and CORS
-- [ ] 2.5 `docs/DEPLOYMENT.md`
+- [ ] 2.4 CORS with the frontend owner's origins
+- [ ] 2.5 `docs/API.md` started, `docs/http/iam.http`
+- [ ] 2.6 `docs/DEPLOYMENT.md` filled with the real names
 - [ ] Verify block passed
 
 ### Phase 3 · Credentials and catalogues
@@ -78,7 +77,7 @@ How to use this file:
 - [ ] 3.3 Endpoints (US10, US11, US13, US14, US15)
 - [ ] 3.4 `CardHolderDirectoryPort` (TS29), events
 - [ ] 3.5 Catalogue read endpoints (spaces, courses, schedules, enrollments)
-- [ ] 3.6 Web app `feature/backend-credentials`
+- [ ] 3.6 Contract: Swagger, `docs/API.md`, `docs/http/credentials.http`; frozen after Verify
 - [ ] Verify block passed
 
 ### Phase 4 · IoT: readers, messaging backbone, ingestion
@@ -90,7 +89,7 @@ How to use this file:
 - [ ] 4.6 `POST /iot/readers/{id}/taps`
 - [ ] 4.7 Tap-resolved consumer and display reply
 - [ ] 4.8 Temporary fallback resolver
-- [ ] 4.9 Web app `feature/backend-iot`
+- [ ] 4.9 Contract (polling-friendly tap events, incidents, reader status); frozen after Verify
 - [ ] Verify block passed
 
 ### Phase 5 · Tap resolution: attendance and access
@@ -99,7 +98,7 @@ How to use this file:
 - [ ] 5.3 Auto-close, teacher endpoints, TS12, TS14–TS17
 - [ ] 5.4 Space & Facility consumer and endpoints (TS18, TS19, TS22, TS28, TS30)
 - [ ] 5.5 Remove fallback resolver
-- [ ] 5.6 Web app `feature/backend-taps`
+- [ ] 5.6 Contract + `docs/http/demo.http`; frozen after Verify
 - [ ] Verify block passed (milestone M2)
 
 ### Phase 6 · Wokwi firmware and the live showcase
@@ -111,21 +110,23 @@ How to use this file:
 - [ ] 6.6 Wokwi tag UIDs in the seed overlay
 - [ ] 6.7 Public wokwi.com project saved, URL documented
 - [ ] 6.8 Demo script rehearsed twice
-- [ ] Verify block passed (milestone M3)
+- [ ] 6.9 Wokwi URL and tag table handed to the frontend owner
+- [ ] Verify block passed (milestone M3; M4 with the frontend is rehearsed with its owner)
 
 ### Phase 7 · Data Management
 - [ ] 7.1 Event ingestion (TS24)
 - [ ] 7.2 Query, dashboard and report endpoints (TS25–TS27)
-- [ ] 7.3 Web app `feature/backend-data`, json-server removed
+- [ ] 7.3 Contract; frozen after Verify
 - [ ] Verify block passed
 
 ### Phase 8 · Reservations
-- [ ] TS20, TS21, TS22 check-in, TS23, e-mail adapter, web app screens
+- [ ] TS20, TS21, TS22 check-in, TS23, e-mail adapter, contract (screens are the frontend owner's)
 - [ ] Verify block passed
 
 ### Phase 9 · Hardening and evidence
 - [ ] 9.1 Load tests (QAS01, QAS02)
 - [ ] 9.2 Sign-in hardening, role review, broker TLS
+- [ ] 9.4 SSE stream, only if the frontend owner asks (D13)
 - [ ] 9.3 Report evidence
 
 ## Log
@@ -223,3 +224,11 @@ How to use this file:
   `feat/sprint1-fase7-testing-suite`; `develop` reverted the test suite). `src/main/resources/seed/db.json` is
   byte-identical to that branch's `server/db.json`. The broker will be RabbitMQ on Azure (student credit).
   Planning was done in one chat; implementation continues in new sessions, so this file is the only memory.
+- 2026-11-22 · Plan revision 4. Team decision: the web app is no longer this plan's job; another team member rebuilds
+  the frontend from the finished backend and the Wokwi code. Consequences written into the plan: web app steps
+  replaced by contract steps (Swagger, `docs/API.md`, `docs/http/*.http`, freeze per phase, D14); live lists are
+  polling-friendly with an `after` cursor and SSE only on request (D13); Verify blocks prove things through API reads
+  instead of screens; the demo script has an API proof per step (M3) and the frontend version becomes M4; the frontend
+  handoff schedule is plan section 8. The old web app stays a read-only reference for rules, model and Spanish texts.
+- 2026-11-22 · Status check: no backend work since 2026-11-16; nothing in Azure; `az` session expired; `gh` CLI is not
+  installed on this machine (CI status could not be checked from here).
