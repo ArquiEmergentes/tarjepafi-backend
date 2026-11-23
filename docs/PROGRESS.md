@@ -30,14 +30,9 @@ How to use this file:
 
 ## Next step
 
-1. Phase 2 remaining: step 2.5 (start `docs/API.md` and `docs/http/iam.http`, run it against the deployed API) and 2.6
-   (real names in `DEPLOYMENT.md`), then the Verify block can be ticked. Ask the frontend owner for their origins.
-2. Phase 2: create the Azure resources in the order of `docs/DEPLOYMENT.md`, asking the person before each paid
-   resource; then step 2.4 (CORS with the frontend owner's origins: ask the person for them) and step 2.5 (start
-   `docs/API.md` and `docs/http/iam.http`); run the phase 2 Verify block against the deployed API.
-3. Give the frontend owner the deployed URL, Swagger UI and `docs/API.md` as soon as phase 2 is verified (plan
-   section 8).
-4. If the cloud steps are blocked, do phase 3 first (no cloud needed) and come back before phase 4 is verified.
+1. Phase 2 is done. Hand the frontend owner the deployed URL, Swagger UI and `docs/API.md`, and ask for their origins
+   (`CORS_ALLOWED_ORIGINS`). Merge `feature/chile-central-region` and `feature/api-contract-iam` into `develop` by PR.
+2. Start phase 3 (credentials and catalogues): declare the `tarjepafi.devices` exchange in the backend as part of it.
 
 ## Checklist
 
@@ -68,9 +63,9 @@ How to use this file:
 - [x] 2.2 Azure resources (App Service B1, Neon, ACI broker), created 2026-11-23
 - [x] 2.3 Broker users (`tarjepafi-backend`, restricted `reader-demo`) (verified on ACI 2026-11-23; see the log for the exchange caveat)
 - [x] 2.4 CORS with the frontend owner's origins
-- [ ] 2.5 `docs/API.md` started, `docs/http/iam.http`
-- [ ] 2.6 `docs/DEPLOYMENT.md` filled with the real names
-- [ ] Verify block passed
+- [x] 2.5 `docs/API.md` started, `docs/http/iam.http` (every request run with curl against the deployed API, 11 of 11 as documented)
+- [x] 2.6 `docs/DEPLOYMENT.md` filled with the real names
+- [x] Verify block passed (2026-11-23: health, `iam.http` 11/11, CORS, `reader-demo` MQTT checks on ACI; the reader user needed the exchange declared by hand, see the log)
 
 ### Phase 3 · Credentials and catalogues
 - [ ] 3.1 Tables

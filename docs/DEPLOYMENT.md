@@ -28,6 +28,21 @@ the subscription's quota there is still to be confirmed when the resources are c
 restriction on PostgreSQL in East US does not matter.
 Resource group: `rg-tarjepafi-demo`. Tag it `purpose=showcase` and `delete-after=<date>`.
 
+**Created on 2026-11-23** (suffix `pafi7k2`, tag `delete-after=2026-12-31`):
+
+| Resource | Name | Address |
+|---|---|---|
+| App Service plan | `asp-tarjepafi-demo` (B1, Linux) | |
+| Backend | `tarjepafi-api-pafi7k2` | `https://tarjepafi-api-pafi7k2.azurewebsites.net` |
+| Broker | `aci-tarjepafi-broker` (1 vCPU, 1.5 GB) | `tarjepafi-broker-pafi7k2.chilecentral.azurecontainer.io`, MQTT 1883, AMQP 5672 |
+| Database | Neon project (direct host, `sslmode=require`) | not an Azure resource |
+
+Generated passwords are in `~/.tarjepafi-secrets.env` and the Neon values in `~/.tarjepafi-neon.env`, both outside the
+repository. Known gap until phase 3: the backend does not declare the `tarjepafi.devices` exchange yet, so after any
+broker (re)start the reader user is missing; declare the exchange by hand with
+`az container exec ... "su-exec rabbitmq rabbitmqadmin --username tarjepafi-backend --password <pass> declare exchange --name tarjepafi.devices --type topic"`
+and the entrypoint creates the user within seconds.
+
 ## What a person must do (an agent cannot)
 
 1. **Neon**: create an account and a project (closest region offered, PostgreSQL 17; already created by the team), copy the direct connection

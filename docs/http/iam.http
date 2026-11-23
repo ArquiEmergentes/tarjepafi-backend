@@ -1,0 +1,66 @@
+### IAM requests (phase 1). Works with the VS Code "REST Client" extension and the IntelliJ HTTP client.
+### Pick the environment, then run the requests in order.
+@host = https://tarjepafi-api-pafi7k2.azurewebsites.net
+# @host = http://localhost:8080
+@origin = http://localhost:4200
+
+### 1. Health (expect {"status":"UP",...})
+GET {{host}}/actuator/health
+
+### 2. Sign in as a teacher (expect 200, token + user)
+# @name signIn
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "docente@upc.edu.pe", "password": "Docente123*" }
+
+###
+@token = {{signIn.response.body.$.token}}
+
+### 3. Current user (expect 200, role TEACHER)
+GET {{host}}/api/v1/auth/me
+Authorization: Bearer {{token}}
+
+### 4. Wrong password (expect 401 INVALID_CREDENTIALS)
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "docente@upc.edu.pe", "password": "wrong" }
+
+### 5. Not an institutional address (expect 400 INVALID_EMAIL)
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "someone@gmail.com", "password": "x" }
+
+### 6. Disabled account (expect 403 ACCOUNT_DISABLED)
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "jsalazar@upc.edu.pe", "password": "Docente123*" }
+
+### 7. Missing body field (expect 400 VALIDATION_FAILED with fields)
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "docente@upc.edu.pe" }
+
+### 8. No token (expect 401)
+GET {{host}}/api/v1/auth/me
+
+### 9. A teacher may not move the clock (expect 403)
+PUT {{host}}/api/v1/simulation/clock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "now": "2026-10-07T10:00:00" }
+
+### 10. Read the clock (expect 200, simulated true on the demo)
+GET {{host}}/api/v1/simulation/clock
+Authorization: Bearer {{token}}
+
+### 11. CORS preflight from the frontend origin (expect 200 and Access-Control-Allow-Origin)
+OPTIONS {{host}}/api/v1/auth/sign-in
+Origin: {{origin}}
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: content-type,authorization
