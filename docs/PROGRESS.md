@@ -15,12 +15,13 @@ How to use this file:
   as a deliverable (plan D2, D13, D14, section 8). The web app steps of the checklist were replaced by contract steps.
 - **Phase 1 is done (milestone M1, 2026-11-16).** Its web app step 1.7 (commit `6b6add6` in `tarjepafi-webapp`) is
   kept only as a reference for the frontend owner.
-- **Phase 2 is in progress; nothing exists in Azure.** Written and verified locally: `Dockerfile`, the broker image
-  with the restricted `reader-demo` user, the published GHCR images against the real Neon project. CI ran green on
-  GitHub (per the earlier note in "Next step"). Region Chile Central, Neon project created, resource group not created.
-  `Microsoft.ContainerInstance` not registered yet.
-- **The Azure CLI login has expired** (refresh token inactive for 90 days, seen 2026-11-22): run `az login` again
-  before any cloud step.
+- **Phase 2 is deployed and verified on Azure (2026-11-23), except the API contract steps (2.5, 2.6).** Resource group
+  `rg-tarjepafi-demo` (Chile Central), App Service B1 `asp-tarjepafi-demo`, backend `tarjepafi-api-pafi7k2`
+  (`https://tarjepafi-api-pafi7k2.azurewebsites.net`), broker `aci-tarjepafi-broker`
+  (`tarjepafi-broker-pafi7k2.chilecentral.azurecontainer.io`), Neon database. Images come from GHCR (public).
+  Generated secrets live outside the repo, in `~/.tarjepafi-secrets.env`, and the Neon values in
+  `~/.tarjepafi-neon.env`. CORS allows `http://localhost:4200` only until the frontend owner gives their origins.
+- **Azure CLI sessions expire** after 90 days idle: run `az login` again before any cloud step.
 - Git: `main` and `develop` exist; this file's latest version lives on `feature/chile-central-region` (one commit
   ahead of `develop`, not merged), together with the revision 4 commit. Merge it into `develop` by PR.
 - Build: JDK 25 is installed and `mvn verify` is green on it, but `JAVA_HOME` may still point at JDK 24: set it to
@@ -29,8 +30,8 @@ How to use this file:
 
 ## Next step
 
-1. A person: `az login` again (Azure for Students); confirm the two GHCR packages are public (the earlier notes
-   disagree: "Current state" said anonymous pull 200, "Next step" still asked for it).
+1. Phase 2 remaining: step 2.5 (start `docs/API.md` and `docs/http/iam.http`, run it against the deployed API) and 2.6
+   (real names in `DEPLOYMENT.md`), then the Verify block can be ticked. Ask the frontend owner for their origins.
 2. Phase 2: create the Azure resources in the order of `docs/DEPLOYMENT.md`, asking the person before each paid
    resource; then step 2.4 (CORS with the frontend owner's origins: ask the person for them) and step 2.5 (start
    `docs/API.md` and `docs/http/iam.http`); run the phase 2 Verify block against the deployed API.
@@ -63,10 +64,10 @@ How to use this file:
 - [x] Verify block passed (milestone M1, 2026-11-16)
 
 ### Phase 2 · Demo environment (first deployment)
-- [ ] 2.1 Dockerfile and CI (Dockerfile verified locally; workflow not yet run on GitHub)
-- [ ] 2.2 Azure resources (App Service, PostgreSQL, broker)
-- [ ] 2.3 Broker users (`tarjepafi-backend`, restricted `reader-demo`) (verified locally on the image; not yet on ACI)
-- [ ] 2.4 CORS with the frontend owner's origins
+- [x] 2.1 Dockerfile and CI (CI green on GitHub, images published to GHCR)
+- [x] 2.2 Azure resources (App Service B1, Neon, ACI broker), created 2026-11-23
+- [x] 2.3 Broker users (`tarjepafi-backend`, restricted `reader-demo`) (verified on ACI 2026-11-23; see the log for the exchange caveat)
+- [x] 2.4 CORS with the frontend owner's origins
 - [ ] 2.5 `docs/API.md` started, `docs/http/iam.http`
 - [ ] 2.6 `docs/DEPLOYMENT.md` filled with the real names
 - [ ] Verify block passed
@@ -232,3 +233,14 @@ How to use this file:
   handoff schedule is plan section 8. The old web app stays a read-only reference for rules, model and Spanish texts.
 - 2026-11-22 · Status check: no backend work since 2026-11-16; nothing in Azure; `az` session expired; `gh` CLI is not
   installed on this machine (CI status could not be checked from here).
+- 2026-11-23 · Phase 2 deployed. Created in Chile Central: resource group, App Service plan B1 and backend app
+  (suffix `pafi7k2`), ACI broker, app settings from the secret files (never printed). Verified on the deployed API:
+  health UP, demo teacher sign-in 200, wrong password 401, no token 401, CORS preflight accepted for
+  `http://localhost:4200` and refused (403) for another origin, HTTP redirects to HTTPS (301). Broker on ACI: `reader-demo`
+  can publish to `tarjepafi/readers/test/tap` and receive on `.../display`; publishing to `other/topic` and subscribing
+  to `#` are refused by the broker; a wrong password is refused. **Finding:** the backend does not declare the
+  `tarjepafi.devices` exchange yet (phase 3 declares it, see the plan), so the reader user did not exist after the first
+  start; the 2026-11-16 note "the backend declares it" was premature. For this check the exchange was declared by hand
+  with `rabbitmqadmin` inside the container. Until the backend declares it, a broker restart leaves no reader user.
+  Signing in as `admin@upc.edu.pe` with the generated admin password gives 401 because the Neon database already held
+  that user from the local test run (the seeder does not update existing users).
