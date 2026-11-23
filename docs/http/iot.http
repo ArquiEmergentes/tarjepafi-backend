@@ -1,0 +1,138 @@
+### IoT requests (phase 4). Works with the VS Code "REST Client" extension and the IntelliJ HTTP client.
+### Run them in order. Needs the ADMIN role. The state changes carry over (readers, incidents, taps).
+@host = https://tarjepafi-api-pafi7k2.azurewebsites.net
+# @host = http://localhost:8080
+@adminEmail = admin@upc.edu.pe
+@adminPassword = Admin123*
+
+### 0. Sign in as administrator (the deployed demo uses another password: ask the backend owner)
+# @name signIn
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "{{adminEmail}}", "password": "{{adminPassword}}" }
+
+###
+@token = {{signIn.response.body.$.token}}
+
+### 1. Readers: all, only INACTIVE (expect RDR-K-002), one with telemetry, incidents and taps
+GET {{host}}/api/v1/iot/readers
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/iot/readers?status=INACTIVE
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/iot/readers/RDR-B-202
+Authorization: Bearer {{token}}
+
+### 2. TS05: register a reader (expect 201, REGISTERED); a second time expect 409 READER_ID_TAKEN
+POST {{host}}/api/v1/iot/readers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "id": "RDR-X-001", "name": "Lector de prueba", "deviceType": "DOOR_READER", "spaceId": "sp-a301",
+  "configuration": { "readerMode": "ACCESS_CONTROL", "communicationInterval": 30, "heartbeatInterval": 60, "firmwareVersion": "1.0.0" } }
+
+### 3. TS05: bad id (expect 400 READER_ID_INVALID)
+POST {{host}}/api/v1/iot/readers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "id": "rdr-1", "name": "x", "deviceType": "DOOR_READER", "spaceId": "sp-a301",
+  "configuration": { "readerMode": "ACCESS_CONTROL", "communicationInterval": 30, "heartbeatInterval": 60, "firmwareVersion": "1.0.0" } }
+
+### 4. TS06: invalid configuration (expect 400 READER_CONFIGURATION_INVALID, errors lists both rules)
+PUT {{host}}/api/v1/iot/readers/RDR-X-001/configuration
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "readerMode": "ACCESS_CONTROL", "communicationInterval": 30, "heartbeatInterval": 20, "firmwareVersion": "1.0" }
+
+### 5. TS07 to TS09: activate, maintenance, end maintenance, deactivate (each 200), activate twice (409)
+POST {{host}}/api/v1/iot/readers/RDR-X-001/activate
+Authorization: Bearer {{token}}
+
+###
+POST {{host}}/api/v1/iot/readers/RDR-X-001/start-maintenance
+Authorization: Bearer {{token}}
+
+###
+POST {{host}}/api/v1/iot/readers/RDR-X-001/end-maintenance
+Authorization: Bearer {{token}}
+
+###
+POST {{host}}/api/v1/iot/readers/RDR-X-001/deactivate
+Authorization: Bearer {{token}}
+
+### 6. Simulated tap on a classroom reader with a student's card (expect 200, outcome ACCESS, tap.received for now)
+POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardUid": "04:3D:9B:12:8F" }
+
+### 7. Unknown card (expect 200, REJECTED, tap.cardNotRegistered); blocked card cred-015 (REJECTED, tap.cardInactive)
+POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardUid": "04:AA:BB:CC:DD" }
+
+###
+POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardUid": "04:4D:DA:3D:91" }
+
+### 8. Reader that cannot process taps (INACTIVE): REJECTED and an incident is opened
+POST {{host}}/api/v1/iot/readers/RDR-K-002/taps
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardUid": "04:3D:9B:12:8F" }
+
+###
+GET {{host}}/api/v1/iot/readers/RDR-K-002/incidents?open=true
+Authorization: Bearer {{token}}
+
+### 9. Bad UID (expect 400 INVALID_CARD_UID)
+POST {{host}}/api/v1/iot/readers/RDR-A-301/taps
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardUid": "04:3D" }
+
+### 10. Polling: the latest events, then only what is new. Copy the nextCursor of the first answer into @cursor.
+GET {{host}}/api/v1/iot/tap-events?readerId=RDR-A-301&limit=5
+Authorization: Bearer {{token}}
+
+###
+@cursor = 0
+GET {{host}}/api/v1/iot/tap-events?readerId=RDR-A-301&after={{cursor}}
+Authorization: Bearer {{token}}
+
+### 11. Telemetry and open incidents
+GET {{host}}/api/v1/iot/readers/RDR-A-302/telemetry?limit=5
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/iot/incidents?open=true
+Authorization: Bearer {{token}}
+
+### 12. A teacher may not read the readers (expect 403)
+# @name teacherIn
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "docente@upc.edu.pe", "password": "Docente123*" }
+
+###
+GET {{host}}/api/v1/iot/readers
+Authorization: Bearer {{teacherIn.response.body.$.token}}
+
+### Real readers (Wokwi) publish MQTT instead, for example with mosquitto:
+###   mosquitto_pub -h <broker> -u reader-demo -P <password> -t tarjepafi/readers/RDR-A-301/tap -m '{"v":1,"type":"CardTapped","eventId":"<uuid>","readerId":"RDR-A-301","cardUid":"04:3D:9B:12:8F","tappedAt":"<UTC instant>","buffered":false}'
+###   mosquitto_sub -h <broker> -u reader-demo -P <password> -t tarjepafi/readers/RDR-A-301/display

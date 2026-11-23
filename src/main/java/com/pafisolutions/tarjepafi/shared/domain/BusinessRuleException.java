@@ -18,6 +18,7 @@ public class BusinessRuleException extends RuntimeException {
 
   private final Kind kind;
   private final String code;
+  private final java.util.Map<String, Object> properties = new java.util.LinkedHashMap<>();
 
   public BusinessRuleException(Kind kind, String code, String message) {
     super(message);
@@ -31,5 +32,15 @@ public class BusinessRuleException extends RuntimeException {
 
   public String code() {
     return code;
+  }
+
+  /** Adds a property to the problem document, for example the list of broken rules. */
+  public BusinessRuleException with(String name, Object value) {
+    properties.put(name, value);
+    return this;
+  }
+
+  public java.util.Map<String, Object> properties() {
+    return java.util.Collections.unmodifiableMap(properties);
   }
 }
