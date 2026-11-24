@@ -106,7 +106,7 @@ The MFRC522 part offers these presets (Wokwi docs). The Blue Card UID can be cha
 | `g` | Green Card | `11:22:33:44` |
 | `y` | Yellow Card | `55:66:77:88` |
 | `r` | Red Card | `AA:BB:CC:DD` |
-| `n` | NFC Tag | `04:11:22:33:44:55:66` |
+| `n` | NFC Tag | `04:11:22:33:44:55:66` documented; the simulated reader returns `04:11:22:33` (4 bytes) |
 | `k` | Key Fob | `C0:FF:EE:99` |
 
 These UIDs are not registered in the demo seed yet (plan phase 6 step 6). Until then every tap is answered with the
