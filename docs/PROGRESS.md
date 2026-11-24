@@ -46,11 +46,11 @@ How to use this file:
   App Service), the Swagger "Authorize" button. Still open: 6.7 to 6.9 and the Verify block (clean rehearsal twice from
   the public Wokwi URL).
 
-- **Phase 7 implemented locally (2026-11-24)** on `feature/data-management`, uncommitted: `V11`, `data_records` ingestion from `data.events.queue`, dashboard, reports with a `GENERATING` state, contract and tests (161 green). Not deployed yet.
+- **Phase 7 is deployed and verified (2026-11-24)**, PR #16: `V11`, `data_records` ingestion from `data.events.queue`, dashboard, reports with a `GENERATING` state, contract frozen, 161 tests green. Phase 6 still needs 6.7, 6.9 and its Verify (see Next step).
 
 ## Next step
 
-0. Phase 7: commit and merge `feature/data-management`, restart the deployed app (`V11` runs, the demo seed adds 503 facts and 3 reports) and run `docs/http/data-management.http` against it: the weekly report of 5 to 11 October must give 497 / 77.5 / 104 / 15 / 07:00 / 7 on a freshly reset environment, then tick the Verify block. Then phase 8.
+0. Phase 8 (Reservations): TS20 to TS23, the e-mail port and `STUDY_CUBICLE` readers; see the plan. Nothing else blocks it.
 1. Phase 6: reset the demo data and restart the app, run the demo script twice from the saved public wokwi.com project
    (6.7, 6.8; rotate the `reader-demo` password afterwards, the project shows it), hand the Wokwi URL and the tag table to
    the frontend owner (6.9), then tick the Verify block.
@@ -136,8 +136,8 @@ How to use this file:
 ### Phase 7 · Data Management
 - [x] 7.1 Event ingestion (TS24)
 - [x] 7.2 Query, dashboard and report endpoints (TS25–TS27)
-- [x] 7.3 Contract written (`docs/API.md`, `docs/http/data-management.http`); **frozen after Verify passes on the deployed API**
-- [ ] Verify block passed. Local part done (2026-11-24): `DataManagementApiTests` (10) against real PostgreSQL and RabbitMQ: the weekly report of 5 to 11 October gives 497 records, 77.5 % attendance, 104 granted, 15 denied, peak 07:00, 7 readers with incidents, the figures the web app's calculator gives on the same seed (its logic reproduces the seeded `rep-001` and `rep-002`); one fact per event after replays. Still to run: the same on the deployed API
+- [x] 7.3 Contract written (`docs/API.md`, `docs/http/data-management.http`); **frozen (Verify passed on the deployed API)**
+- [x] Verify block passed (2026-11-24, deployed, image of `develop` at `56b007c`, `V11` ran, Neon truncated before so the demo seed loaded): 11 checks through the API. The weekly report of 5 to 11 October went `GENERATING` (202) then `GENERATED` with 497 records, 77.5 % attendance, 104 granted, 15 denied, peak 07:00, 7 readers with incidents; the report of 5 and 6 October equals the seeded `rep-002`; the dashboard of 6 October gives PRESENT 11 / LATE 6 / ABSENT 5 / PENDING 18, 77.3 %, 38 / 6, 95 readings; the teacher gets 403, an unknown type 400, an unknown report 404. One live simulated tap added exactly one `CARD_READING` and one `ATTENDANCE` fact. Locally `DataManagementApiTests` (10) cover the same plus replays and the dead letter queue
 
 ### Phase 8 · Reservations
 - [ ] TS20, TS21, TS22 check-in, TS23, e-mail adapter, contract (screens are the frontend owner's)
@@ -346,4 +346,4 @@ How to use this file:
   seed UIDs stop working while `TARJEPAFI_DEMO_WOKWI_TAGS` is true. Reply texts differ from the plan's table: "Llegada
   registrada" (not "Clase iniciada"). After a restart the API answers about 2 minutes before the seed finishes.
 - 2026-11-24 · Phase 7 (local). Ported `report-calculator.ts` to `ReportCalculator`; before writing the Verify the same logic was run in Python on the seed (`dataRecords`, 503 rows) and reproduced the seeded `rep-001` and `rep-002` exactly, so the expected numbers of the weekly report of 5 to 11 October are 497 / 77.5 / 104 / 15 / 07:00 / 7. Decisions: (1) `data_records` is unique on (`event_id`, `data_type`, `subject_id`), not on `event_id` alone, because the seed has several facts per event; the envelope's `eventId` is the idempotency key of a live fact. (2) Facts: `iot.card-tap` and `iot.tap-rejected` are the `CARD_READING`s (the accepted outcome is not known to IoT at that point, so the payload says `ACCEPTED`/`REJECTED`), `attendance.recorded|confirmed|edited`, `space.access-*`, `space.work-shift-*`, `credentials.credential-status-changed` and `iot.incident-opened`; the tap-resolved events and `attendance.late-detected` are not facts. (3) The dashboard uses only data records, so reader and card status are not in it (other contexts own them). (4) Reports are created `GENERATING` and a 1 s job completes them once 2 s of real time have passed (`tarjepafi.reports.generation-delay-ms`), so a restart cannot strand one. (5) Facts are dated with the campus clock, so the demo week's report also counts the live demo's taps; the Verify numbers hold on a reset environment.
-
+- 2026-11-24 · Phase 7 deployed and verified. Restarted after truncating the context tables; the first truncate failed because `data_records` did not exist yet (`V11` had not run), so the reset script lists the new tables only from now on and the very first deploy of a migration needs the old list. The seed finishes about 2 minutes after the API answers (data seeder last). The environment was reset again after the live tap: reports `rep-001` to `rep-003`, clock 09:50, `ses-02-7` SCHEDULED with 20 unmarked.
