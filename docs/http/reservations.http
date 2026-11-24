@@ -1,0 +1,96 @@
+### Reservation requests (phase 8). Works with the VS Code "REST Client" extension and the IntelliJ HTTP client.
+### Needs the ADMIN role. The study cubicle CUB-L01 (sp-cub-l1) requires a reservation (students only) and its reader is RDR-K-003.
+### The clock starts at Wed 2026-10-07 09:50; the slots below are in the future of that clock.
+@host = https://tarjepafi-api-pafi7k2.azurewebsites.net
+# @host = http://localhost:8080
+@adminEmail = admin@upc.edu.pe
+@adminPassword = Admin123*
+
+### 0. Sign in as administrator (the deployed demo uses another password: ask the backend owner)
+# @name signIn
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "{{adminEmail}}", "password": "{{adminPassword}}" }
+
+###
+@token = {{signIn.response.body.$.token}}
+
+### 1. Reserve the cubicle for the demo student (U202312966) from 10:00 to 11:00: 201 CONFIRMED, checkInWindowEnd 10:10
+# @name created
+POST {{host}}/api/v1/spaces/sp-cub-l1/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardHolderId": "ch-u202312966", "startTime": "2026-10-07T10:00:00", "endTime": "2026-10-07T11:00:00" }
+
+###
+@reservationId = {{created.response.body.$.id}}
+
+### 2. Errors: 409 RESERVATION_OVERLAP (an overlapping slot), 422 ROLE_NOT_ALLOWED (a teacher)
+POST {{host}}/api/v1/spaces/sp-cub-l1/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardHolderId": "ch-u202310685", "startTime": "2026-10-07T10:30:00", "endTime": "2026-10-07T11:30:00" }
+
+###
+POST {{host}}/api/v1/spaces/sp-cub-l1/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardHolderId": "ch-d0001", "startTime": "2026-10-07T12:00:00", "endTime": "2026-10-07T13:00:00" }
+
+### 3. Look it up, the ones in progress, and the history of the space
+GET {{host}}/api/v1/reservations/{{reservationId}}
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/reservations/active
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/spaces/sp-cub-l1/reservations?from=2026-10-07T00:00:00&to=2026-10-07T23:59:59
+Authorization: Bearer {{token}}
+
+### 4. Check in with the card: put the clock at 10:05 and tap RDR-K-003 with the student's card.
+###    Expect REJECTED "Tu reserva aun no comienza" before 10:00 and ACCESS "Reserva activada" between 10:00 and 10:10.
+###    The reservation becomes CHECKED_IN and the space OCCUPIED (GET /spaces/sp-cub-l1).
+PUT {{host}}/api/v1/simulation/clock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "now": "2026-10-07T10:05:00" }
+
+###
+POST {{host}}/api/v1/iot/readers/RDR-K-003/taps
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardUid": "04:3D:9B:12:8F" }
+
+### 5. Forfeit: a reservation nobody checks in. Reserve for 12:00, move the clock past 12:10 and wait a minute at most:
+###    status FORFEITED, the slot is free, and the holder gets an e-mail (only logged when no mail server is configured).
+POST {{host}}/api/v1/spaces/sp-cub-l1/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cardHolderId": "ch-u202310685", "startTime": "2026-10-07T12:00:00", "endTime": "2026-10-07T13:00:00" }
+
+###
+PUT {{host}}/api/v1/simulation/clock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "now": "2026-10-07T12:11:00" }
+
+### 6. Cancel a CONFIRMED reservation (409 INVALID_RESERVATION_STATE when it is not)
+POST {{host}}/api/v1/reservations/{{reservationId}}/cancel
+Authorization: Bearer {{token}}
+
+### 7. Put the clock back at the start (and restart the app to reseed)
+PUT {{host}}/api/v1/simulation/clock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "now": "2026-10-07T09:50:00" }

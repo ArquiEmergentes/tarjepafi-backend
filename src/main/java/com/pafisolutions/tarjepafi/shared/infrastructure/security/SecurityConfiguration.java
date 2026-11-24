@@ -75,6 +75,8 @@ public class SecurityConfiguration {
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/spaces/**")
                     .hasRole("ADMIN")
+                    .requestMatchers("/api/v1/reservations/**", "/api/v1/spaces/*/reservations")
+                    .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/v1/spaces/*/occupancy")
                     .hasRole("ADMIN")
                     .requestMatchers("/api/v1/class-sessions/**")

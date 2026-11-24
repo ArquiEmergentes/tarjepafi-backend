@@ -315,7 +315,7 @@ Routes need the **ADMIN** role (reads of spaces stay open to any signed-in user,
 
 `AccessRecord`: `{ id, cursor, tapEventId, cardUid, credentialId, cardHolderId, spaceId, readerId, accessType
 (CAMPUS_ENTRY, CAMPUS_EXIT, SPACE_ACCESS), decision (GRANTED, DENIED), denialReason (NONE, CARD_NOT_REGISTERED,
-CARD_INACTIVE, UNAUTHORIZED_ROLE, SPACE_IN_MAINTENANCE), attemptedAt }`.
+CARD_INACTIVE, UNAUTHORIZED_ROLE, SPACE_IN_MAINTENANCE, and from phase 8 NO_RESERVATION, RESERVATION_NOT_STARTED, RESERVATION_EXPIRED), attemptedAt }`.
 `WorkShift`: `{ id, cursor, cardHolderId, date, entryAt, exitAt, workedMinutes, status (OPEN, CLOSED) }`.
 
 | Route | Answer and errors |
@@ -336,6 +336,44 @@ Events published (for information; data management consumes them): `attendance.r
 `attendance.late-detected`, `attendance.edited`, `attendance.rejected`, `attendance.session-closed`,
 `attendance.tap-resolved`, `space.access-granted`, `space.access-denied`, `space.work-shift-opened`,
 `space.work-shift-closed`, `space.tap-resolved`.
+
+## Reservations (phase 8)
+
+A space with the access policy **`RESERVATION_REQUIRED`** (the study cubicle `CUB-L01` in the demo, students only) is
+entered with a reservation. An administrator reserves a slot for a card holder; the holder then **taps the card at the
+reader of the space** (`RDR-K-003` at the cubicle) between the start of the slot and 10 minutes later: the reservation
+becomes `CHECKED_IN` and the space `OCCUPIED`. Without that tap the reservation is `FORFEITED` 10 minutes after its start,
+the slot is free again and the holder gets an e-mail (US28, TS-CON07). When the slot of a `CHECKED_IN` reservation ends it
+is `COMPLETED` and the space is `AVAILABLE` again. The sweep runs every minute of real time with the campus clock, so with
+the simulated clock it acts shortly after the clock is moved.
+
+Routes need the **ADMIN** role. Space `status` can now also be `OCCUPIED` (set by the check-in, not by `PATCH`), and
+`accessPolicy` can be `RESERVATION_REQUIRED` (`POST /spaces` and `PATCH /spaces/{id}/access-policy` accept it).
+
+`Reservation`: `{ id, reservationCode ("RES-2026-04872"), spaceId, cardHolderId, startTime, endTime, status (CONFIRMED,
+CHECKED_IN, COMPLETED, CANCELLED, FORFEITED), checkInWindowEnd (startTime + 10 minutes), checkedInAt, createdAt }`.
+
+| Route | Answer and errors |
+|---|---|
+| `POST /spaces/{spaceId}/reservations` | Body `{ cardHolderId, startTime, endTime }` (campus date-times). **`201`** `Reservation` CONFIRMED. `404 SPACE_NOT_FOUND`; `400 INVALID_TIME_SLOT` (a field is missing or the end is not after the start); `422 SPACE_NOT_RESERVABLE` (the policy is not `RESERVATION_REQUIRED` or the space is in maintenance), `HOLDER_NOT_FOUND`, `HOLDER_WITHOUT_ACTIVE_CREDENTIAL`, `ROLE_NOT_ALLOWED` (the space does not admit the role of the holder), `SLOT_NOT_IN_FUTURE`; `409 RESERVATION_OVERLAP` with a CONFIRMED or CHECKED_IN reservation (touching slots do not overlap). |
+| `POST /reservations/{id}/cancel` | `200` CANCELLED. Only a CONFIRMED reservation: `409 INVALID_RESERVATION_STATE` otherwise; `404 RESERVATION_NOT_FOUND`. |
+| `GET /reservations/{id}` | `Reservation`. `404 RESERVATION_NOT_FOUND`. |
+| `GET /reservations/active` | `[Reservation]` CONFIRMED or CHECKED_IN whose slot contains the campus time now, for the whole campus; `[]` when none. |
+| `GET /spaces/{spaceId}/reservations?from=&to=` | `[Reservation]` whose slot touches the range, oldest first; both bounds optional (campus date-times). `404 SPACE_NOT_FOUND`, `400 INVALID_RANGE`. |
+
+What the reader of a reservation space answers to a tap: `tap.reservationActivated` ("Reserva activada · {space} · hasta
+las {until}", outcome `ACCESS`), `tap.reservationAlreadyActive` (outcome `ACCESS`, info), `tap.reservationNotStarted`
+(before the start), `tap.reservationExpired` (after the 10 minutes, if the sweep has not forfeited it yet) and
+`tap.noReservation`; the last three are `REJECTED` and leave a `DENIED` access record with `RESERVATION_NOT_STARTED`,
+`RESERVATION_EXPIRED` or `NO_RESERVATION`. A tap in a reservation space under maintenance is `tap.accessDenied`.
+
+Events published (for information): `space.reservation-created`, `space.reservation-cancelled`,
+`space.reservation-activated`, `space.reservation-forfeited`, `space.space-occupied`, `space.space-released`. Data
+management does not record them yet.
+
+The release e-mail goes through SMTP when the backend has `SPRING_MAIL_HOST` (and `SPRING_MAIL_PORT`, user and password)
+configured; otherwise it is only written to the log. If the mail service is down the reservation stays `FORFEITED` and
+the error is logged.
 
 ## Data management (phase 7)
 
@@ -398,3 +436,4 @@ Request examples that run against any environment: `docs/http/iam.http`.
 - 2026-11-24 · Additive: `TapEvent.buffered` (boolean, true when the reader stored the tap while offline and sent it afterwards; false for simulated and live taps). New Swagger "Authorize" button for the bearer token.
 - 2026-11-24 · Behaviour fix (no shape change): live reader messages (taps with `buffered: false`, heartbeat, telemetry, error) are stamped with the campus clock's now instead of the device time. A device clock that drifts from real time (the Wokwi simulator runs slower) used to date heartbeats further and further in the past, so with the simulated clock the reader stayed `OFFLINE` after a clock move. Only taps with `buffered: true` keep their own time, converted to campus time.
 - 2026-11-24 · Data management section (phase 7): `GET /data-records`, `GET /dashboard`, `POST /reports/{weekly|monthly|semester}` (202, polling), `GET /reports`, `GET /reports/{id}`. Verified on the deployed API and **frozen**: from now on only additive changes, announced here.
+- 2026-11-24 · Reservations section (phase 8): `POST /spaces/{id}/reservations`, `POST /reservations/{id}/cancel`, `GET /reservations/{id}`, `GET /reservations/active`, `GET /spaces/{id}/reservations`. Additive changes to frozen sections: space `status` can be `OCCUPIED`, `accessPolicy` can be `RESERVATION_REQUIRED`, access records have three new `denialReason` values, and the demo seed has a reader `RDR-K-003` at the cubicle. New, so the reservation routes are not frozen until verified on the deployed API.

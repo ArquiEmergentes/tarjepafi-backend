@@ -1,4 +1,4 @@
-# Local infrastructure for the backend: PostgreSQL and RabbitMQ (AMQP for the backend, MQTT for readers).
+# Local infrastructure for the backend: PostgreSQL, RabbitMQ (AMQP for the backend, MQTT for readers) and a mail catcher.
 services:
   postgres:
     image: postgres:17-alpine
@@ -34,6 +34,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  # Catches the e-mails of the backend (reservations released after 10 minutes). SMTP on 1025, inbox at http://localhost:8025.
+  # Start the backend with SPRING_MAIL_HOST=localhost SPRING_MAIL_PORT=1025 to send to it.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "${MAIL_SMTP_PORT:-1025}:1025"
+      - "${MAIL_UI_PORT:-8025}:8025"
 
 volumes:
   postgres-data:
