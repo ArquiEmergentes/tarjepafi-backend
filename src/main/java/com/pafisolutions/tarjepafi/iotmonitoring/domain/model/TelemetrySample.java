@@ -7,6 +7,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
 
 /** One telemetry message of a reader. {@code signalStrength} is in dBm: closer to 0 is better. */
 @Entity
@@ -17,6 +19,11 @@ public class TelemetrySample {
   public static final int WEAK_SIGNAL_DBM = -75;
 
   @Id private String id;
+
+  /** Insertion order, assigned by the database: breaks ties between samples stamped in the same second. */
+  @Generated(event = EventType.INSERT)
+  @Column(name = "seq", insertable = false, updatable = false)
+  private Long seq;
 
   @Column(name = "reader_id", nullable = false)
   private String readerId;

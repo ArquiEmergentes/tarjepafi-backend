@@ -59,7 +59,7 @@ public class ReaderService {
   @Transactional(readOnly = true)
   public List<TelemetrySample> telemetry(String readerId, int limit) {
     find(readerId);
-    return telemetry.findByReaderIdOrderByCapturedAtDescIdDesc(
+    return telemetry.findByReaderIdOrderByCapturedAtDescSeqDesc(
         readerId, PageRequest.of(0, Math.max(1, Math.min(limit, 500))));
   }
 
