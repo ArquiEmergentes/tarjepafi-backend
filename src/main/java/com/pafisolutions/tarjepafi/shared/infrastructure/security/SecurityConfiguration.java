@@ -66,7 +66,10 @@ public class SecurityConfiguration {
                         "/api/v1/card-holders/**",
                         "/api/v1/iot/**",
                         "/api/v1/access-records/**",
-                        "/api/v1/work-shifts/**")
+                        "/api/v1/work-shifts/**",
+                        "/api/v1/data-records/**",
+                        "/api/v1/dashboard/**",
+                        "/api/v1/reports/**")
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.POST, "/api/v1/spaces")
                     .hasRole("ADMIN")

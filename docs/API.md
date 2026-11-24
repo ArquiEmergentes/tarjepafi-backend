@@ -337,6 +337,42 @@ Events published (for information; data management consumes them): `attendance.r
 `attendance.tap-resolved`, `space.access-granted`, `space.access-denied`, `space.work-shift-opened`,
 `space.work-shift-closed`, `space.tap-resolved`.
 
+## Data management (phase 7)
+
+Every fact the other contexts publish is recorded once as an immutable **data record**; the dashboard and the reports are
+computed from those records only. Routes need the **ADMIN** role.
+
+What is recorded (TS24), from the integration events:
+
+| `dataType` (`sourceContext`) | From the event | `subjectId` | `occurredAt` | `payload` |
+|---|---|---|---|---|
+| `CARD_READING` (`IOT_MONITORING`) | `iot.card-tap`, `iot.tap-rejected` | the reader | the tap | `cardUid`, `outcome` (`ACCEPTED`, `REJECTED`), `reason` (rejected), `spaceId`, `cardHolderId` |
+| `ATTENDANCE` (`ACADEMIC_ATTENDANCE`) | `attendance.recorded`, `.confirmed`, `.edited` | the attendance mark | the event | `sessionId`, `role`, `status` |
+| `ACCESS` (`SPACE_AND_FACILITY`) | `space.access-granted`, `space.access-denied` | the access record | the attempt | `decision`, `denialReason`, `accessType`, `spaceId` |
+| `WORK_SHIFT` (`SPACE_AND_FACILITY`) | `space.work-shift-opened`, `.closed` | the shift | exit or entry | `status`, `workedMinutes` |
+| `CREDENTIAL_CHANGE` (`CREDENTIALS`) | `credentials.credential-status-changed` | the credential | the event | `fromStatus`, `toStatus`, `reason` |
+| `DEVICE_TELEMETRY` (`IOT_MONITORING`) | `iot.incident-opened` | the reader | detection | `incidentType`, `incidentId` |
+
+A mark can have several `ATTENDANCE` facts (PENDING, then PRESENT, then an edit): the last one counts. The same event
+delivered again records nothing. An event that breaks the rules of a record (a missing subject, a source that does not
+produce that type) is parked in `data.events.queue.dlq`.
+
+`DataRecord`: `{ id, cursor, eventId, sourceContext, dataType, subjectId, occurredAt, recordedAt, payload }`.
+`Report`: `{ id, reportType (WEEKLY, MONTHLY, SEMESTER), periodStart, periodEnd, status (GENERATING, GENERATED, ERROR),
+generatedAt, totalRecords, summary, requestedBy }` with `summary` `{ attendanceRate (% of students present or late over
+the resolved marks, 0 without any), accessGranted, accessDenied, peakHour ("HH:00" with the most card readings, or null),
+readersWithIncidents }`; `summary` and `generatedAt` are null while `GENERATING`.
+
+| Route | Answer and errors |
+|---|---|
+| `GET /data-records` | **Polling.** `{ items, nextCursor }`, newest first. Filters `type`, `source`, `subjectId`, `from`, `to` (campus date-times of `occurredAt`); `after`, `limit` (default 50, at most 200). `400 INVALID_DATA_TYPE`, `INVALID_SOURCE_CONTEXT`, `INVALID_RANGE`, `INVALID_CURSOR`. |
+| `GET /dashboard?date=` | The day (default today by the campus clock): `{ date, now, attendance: { byStatus, rate }, access: { granted, denied }, readings: { today, byHour: [{ hour, count }], recent: [DataRecord] }, readersWithIncidents }`. `byStatus` counts students by the last fact of each mark. Reader and card status are not here: read them from the IoT and credentials routes. |
+| `POST /reports/{weekly\|monthly\|semester}` | Body optional `{ periodStart, periodEnd }` (`yyyy-MM-dd`, end inclusive); without it the week (Monday to Sunday), month or academic term (March to July, August to December) that contains today by the campus clock. **`202`** with the report `GENERATING`; poll `GET /reports/{id}` until `status` is `GENERATED` (about 2 seconds; `ERROR` if it could not be computed). `400 INVALID_REPORT_TYPE`, `INVALID_PERIOD`. |
+| `GET /reports` | `[Report]`: the ones `GENERATING` first, then the most recently generated. |
+| `GET /reports/{id}` | `{ report, days: [{ date, readings, attendanceRate, accessGranted, accessDenied }] }` (TS27): the days of the period with at least one fact, empty until `GENERATED`; `attendanceRate` is null when no attendance was resolved that day. `404 REPORT_NOT_FOUND`. |
+
+The facts are dated with the campus clock, so a report of the demo week also counts the taps of the live demo.
+
 ## Demo accounts (profile `demo`)
 
 | E-mail | Password | Role | Status |
@@ -361,3 +397,4 @@ Request examples that run against any environment: `docs/http/iam.http`.
 - 2026-11-24 · Attendance and space access sections (phase 5): teacher routes under `/class-sessions`, `/access-records`, `/work-shifts`, space management and occupancy, campus presences. Verified on the deployed API and **frozen**. A tap that writes records may take more than 3 seconds to resolve on the deployed stack: `POST /iot/readers/{id}/taps` then answers `202` with the event `PENDING`; poll `GET /iot/tap-events/{id}`. **Behaviour change of the frozen IoT section:** valid taps no longer resolve as `ACCESS` / `tap.received`; `outcome`, `tone`, `messageKey` and `displayMessage` now come from the attendance and access rules (the shape of `TapEvent` did not change). `POST /spaces` and `PATCH /spaces/**` are new admin-only routes next to the open `GET`s.
 - 2026-11-24 · Additive: `TapEvent.buffered` (boolean, true when the reader stored the tap while offline and sent it afterwards; false for simulated and live taps). New Swagger "Authorize" button for the bearer token.
 - 2026-11-24 · Behaviour fix (no shape change): live reader messages (taps with `buffered: false`, heartbeat, telemetry, error) are stamped with the campus clock's now instead of the device time. A device clock that drifts from real time (the Wokwi simulator runs slower) used to date heartbeats further and further in the past, so with the simulated clock the reader stayed `OFFLINE` after a clock move. Only taps with `buffered: true` keep their own time, converted to campus time.
+- 2026-11-24 · Data management section (phase 7): `GET /data-records`, `GET /dashboard`, `POST /reports/{weekly|monthly|semester}` (202, polling), `GET /reports`, `GET /reports/{id}`. New, so not frozen until verified on the deployed API.
