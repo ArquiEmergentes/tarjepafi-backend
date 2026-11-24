@@ -25,7 +25,9 @@ public class DeviceEventConsumer {
     this.handler = handler;
   }
 
-  @RabbitListener(queues = IotMessagingTopology.DEVICE_EVENTS_QUEUE)
+  @RabbitListener(
+      queues = IotMessagingTopology.DEVICE_EVENTS_QUEUE,
+      concurrency = "${tarjepafi.amqp.concurrency.device-events:4-8}")
   public void onMessage(Message message) {
     String routingKey = message.getMessageProperties().getReceivedRoutingKey();
     DeviceMessage parsed = adapter.parse(routingKey, message.getBody());

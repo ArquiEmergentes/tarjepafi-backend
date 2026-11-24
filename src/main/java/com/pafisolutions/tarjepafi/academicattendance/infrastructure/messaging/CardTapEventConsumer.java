@@ -44,7 +44,8 @@ public class CardTapEventConsumer {
         Topology.bind(queue, MessagingConfiguration.EVENTS_EXCHANGE, "iot.card-tap"));
   }
 
-  @RabbitListener(queues = QUEUE)
+  // One consumer on purpose: the marks of a class depend on the order of the teacher's and the students' taps.
+  @RabbitListener(queues = QUEUE, concurrency = "${tarjepafi.amqp.concurrency.attendance-card-tap:1}")
   public void onMessage(Message message) {
     Map<String, Object> data = mapper.readValue(message.getBody(), DATA);
     @SuppressWarnings("unchecked")

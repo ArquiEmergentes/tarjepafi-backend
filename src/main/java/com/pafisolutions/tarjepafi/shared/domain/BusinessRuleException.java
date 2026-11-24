@@ -13,7 +13,8 @@ public class BusinessRuleException extends RuntimeException {
     FORBIDDEN,
     NOT_FOUND,
     CONFLICT,
-    UNPROCESSABLE
+    UNPROCESSABLE,
+    TOO_MANY_REQUESTS
   }
 
   private final Kind kind;

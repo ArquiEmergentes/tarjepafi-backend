@@ -12,8 +12,12 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
+import org.hibernate.annotations.DynamicUpdate;
 
 /** An NFC reader installed in a space (rule 6.C). */
+// Only the changed columns are updated: taps, heartbeats and telemetry of one reader are handled concurrently and
+// must not overwrite each other's fields.
+@DynamicUpdate
 @Entity
 @Table(name = "readers")
 public class Reader {

@@ -10,7 +10,7 @@ spring:
     hikari:
       # Sized for a serverless PostgreSQL (Neon free plan): few connections, idle ones retire before the server drops
       # them, and a connect may have to wait for a suspended compute to wake up.
-      maximum-pool-size: ${DB_POOL_SIZE:5}
+      maximum-pool-size: ${DB_POOL_SIZE:10}
       minimum-idle: ${DB_POOL_MIN_IDLE:0}
       idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:60000}
       max-lifetime: ${DB_POOL_MAX_LIFETIME_MS:300000}
@@ -32,6 +32,8 @@ spring:
         # A message that fails (malformed payload, database down) is tried 3 times and then dead-lettered
         # to the <queue>.dlq of the queue it came from (queues declare tarjepafi.dlx, see Topology).
         default-requeue-rejected: false
+        # Consumers fetch a few messages at a time so several of them share the load (see tarjepafi.amqp.concurrency.*).
+        prefetch: 10
         retry:
           enabled: true
           max-attempts: 3
@@ -40,6 +42,8 @@ spring:
 
 server:
   port: ${PORT:8080}
+  # Behind the App Service front end the caller's address is in X-Forwarded-For (the sign-in throttle uses it).
+  forward-headers-strategy: framework
 
 management:
   endpoints:
@@ -88,6 +92,11 @@ spring:
       on-profile: demo
 
 tarjepafi:
+  credentials:
+    enrollment-verification:
+      # The daily job would deactivate the cards of students with a pending enrollment as soon as it fires while the
+      # demo clock is past the deadline (2026-10-03). In the demo it is run by hand (POST /credentials/enrollment-verification).
+      enabled: false
   clock:
     mode: simulated
     initial: 2026-10-07T09:50:00

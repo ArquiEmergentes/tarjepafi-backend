@@ -5,6 +5,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -104,6 +105,25 @@ class AuthApiTests {
     mvc.perform(signIn("soporte@upc.edu.pe", "wrong"))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+  }
+
+  @Test
+  void signIn_repeatedWrongPasswords_lockTheAccountEvenForTheRightPassword() throws Exception {
+    // trabajador is not used by any other test of this class; five failures lock the e-mail for five minutes.
+    for (int attempt = 1; attempt <= 5; attempt++) {
+      mvc.perform(signIn("trabajador@upc.edu.pe", "wrong-" + attempt))
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+    }
+
+    mvc.perform(signIn("trabajador@upc.edu.pe", "wrong-again"))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.code").value("TOO_MANY_ATTEMPTS"))
+        .andExpect(jsonPath("$.retryAfterSeconds").isNumber())
+        .andExpect(header().exists(HttpHeaders.RETRY_AFTER));
+    mvc.perform(signIn("trabajador@upc.edu.pe", "Trabajador123*")).andExpect(status().isTooManyRequests());
+    // Other accounts are not affected.
+    mvc.perform(signIn("admin@upc.edu.pe", "Admin123*")).andExpect(status().isOk());
   }
 
   @Test

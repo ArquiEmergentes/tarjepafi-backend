@@ -33,11 +33,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
           case NOT_FOUND -> HttpStatus.NOT_FOUND;
           case CONFLICT -> HttpStatus.CONFLICT;
           case UNPROCESSABLE -> HttpStatus.valueOf(422);
+          case TOO_MANY_REQUESTS -> HttpStatus.TOO_MANY_REQUESTS;
         };
     ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, exception.getMessage());
     problem.setProperty(CODE, exception.code());
     exception.properties().forEach(problem::setProperty);
-    return ResponseEntity.status(status).body(problem);
+    ResponseEntity.BodyBuilder response = ResponseEntity.status(status);
+    Object retryAfter = exception.properties().get("retryAfterSeconds");
+    if (retryAfter != null) {
+      response.header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter));
+    }
+    return response.body(problem);
   }
 
   @Override

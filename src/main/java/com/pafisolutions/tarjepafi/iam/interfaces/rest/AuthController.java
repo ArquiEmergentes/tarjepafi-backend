@@ -6,6 +6,7 @@ import com.pafisolutions.tarjepafi.shared.domain.BusinessRuleException;
 import com.pafisolutions.tarjepafi.shared.domain.BusinessRuleException.Kind;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -34,9 +35,13 @@ public class AuthController {
   @Operation(
       summary = "Sign in with an institutional e-mail and password",
       description =
-          "Errors carry a `code`: 400 INVALID_EMAIL, 401 INVALID_CREDENTIALS, 403 ACCOUNT_DISABLED.")
-  public AuthenticatedUserResource signIn(@Valid @RequestBody SignInResource body) {
-    AuthenticationService.SignedIn signedIn = authentication.signIn(body.email(), body.password());
+          "Errors carry a `code`: 400 INVALID_EMAIL, 401 INVALID_CREDENTIALS, 403 ACCOUNT_DISABLED, 429 "
+              + "TOO_MANY_ATTEMPTS (5 failed attempts for an e-mail, or 30 from one address, lock it for 5 minutes; "
+              + "the `Retry-After` header and `retryAfterSeconds` say how long).")
+  public AuthenticatedUserResource signIn(
+      @Valid @RequestBody SignInResource body, HttpServletRequest request) {
+    AuthenticationService.SignedIn signedIn =
+        authentication.signIn(body.email(), body.password(), request.getRemoteAddr());
     return new AuthenticatedUserResource(signedIn.token(), UserResource.from(signedIn.user()));
   }
 

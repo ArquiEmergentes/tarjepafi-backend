@@ -47,7 +47,7 @@ public class DataEventConsumer {
         Topology.bind(queue, MessagingConfiguration.EVENTS_EXCHANGE, "credentials.#"));
   }
 
-  @RabbitListener(queues = QUEUE)
+  @RabbitListener(queues = QUEUE, concurrency = "${tarjepafi.amqp.concurrency.data-events:2-4}")
   @SuppressWarnings("unchecked")
   public void onMessage(Message message) {
     Map<String, Object> envelope = mapper.readValue(message.getBody(), MESSAGE);
