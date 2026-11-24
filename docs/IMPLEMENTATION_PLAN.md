@@ -264,7 +264,7 @@ milestone **M3** is the script passing with the API reads (Swagger UI or `docs/h
   teacher `D0001`, staff `T0001`, one blocked card, one unregistered).
   Found in phase 6 (Wokwi docs): click the part to open its panel, pick a card and press Tap (500 ms) or Hold. Presets:
   Blue `01:02:03:04` (UID settable with the part's `uid` attribute), Green `11:22:33:44`, Yellow `55:66:77:88`,
-  Red `AA:BB:CC:DD`, NFC Tag `04:11:22:33:44:55:66` (7 bytes), Key Fob `C0:FF:EE:99`. All fit the backend's UID
+  Red `AA:BB:CC:DD`, NFC Tag `04:11:22:33:44:55:66` (documented with 7 bytes, but the simulated MFRC522 returned only `04:11:22:33` in phase 6), Key Fob `C0:FF:EE:99`. All fit the backend's UID
   format (4 to 7 bytes).
 - **Time.** The reader stamps real UTC time from NTP; the deployed backend runs with the simulated campus clock
   (D8), which maps device time onto campus time. The presenter moves the clock from the frontend (or Swagger UI).

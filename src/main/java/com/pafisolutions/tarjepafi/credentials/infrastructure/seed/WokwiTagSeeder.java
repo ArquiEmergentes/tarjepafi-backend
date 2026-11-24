@@ -31,7 +31,7 @@ public class WokwiTagSeeder implements ApplicationRunner {
   static final Map<String, String> TAGS =
       Map.of(
           "cred-001", "01:02:03:04", // Blue: student U202312966 (ACTIVE)
-          "cred-041", "04:11:22:33:44:55:66", // NFC Tag: teacher D0001 (ACTIVE)
+          "cred-041", "04:11:22:33", // NFC Tag: teacher D0001 (ACTIVE); the simulated MFRC522 reports only its first 4 bytes
           "cred-045", "11:22:33:44", // Green: staff T0001 (ACTIVE)
           "cred-015", "55:66:77:88"); // Yellow: student U202311918 (BLOCKED)
 
