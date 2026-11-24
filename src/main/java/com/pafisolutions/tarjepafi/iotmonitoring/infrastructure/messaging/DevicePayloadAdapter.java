@@ -79,9 +79,9 @@ public class DevicePayloadAdapter {
     if (!CardTapEvent.isValidUid(uid)) {
       throw new MalformedDevicePayloadException("cardUid is not a valid UID");
     }
+    boolean buffered = json.path("buffered").asBoolean(false);
     TapSource source = "SIMULATOR".equals(text(json, "source")) ? TapSource.SIMULATOR : TapSource.READER;
-    return new TapReceived(eventId, readerId, uid, instant(json, "tappedAt"), source,
-        json.path("buffered").asBoolean(false));
+    return new TapReceived(eventId, readerId, uid, buffered ? instant(json, "tappedAt") : live(json, "tappedAt"), source, buffered);
   }
 
   private TelemetryReceived telemetry(JsonNode json, String readerId) {
@@ -95,12 +95,12 @@ public class DevicePayloadAdapter {
       throw new MalformedDevicePayloadException("uptime must be a non-negative number of seconds");
     }
     return new TelemetryReceived(
-        readerId, instant(json, "capturedAt"), signal.asInt(), uptime.asLong(), required(json, "firmwareVersion"));
+        readerId, live(json, "capturedAt"), signal.asInt(), uptime.asLong(), required(json, "firmwareVersion"));
   }
 
   private HeartbeatReceived heartbeat(JsonNode json, String readerId) {
     expectType(json, "Heartbeat");
-    return new HeartbeatReceived(readerId, instant(json, "sentAt"));
+    return new HeartbeatReceived(readerId, live(json, "sentAt"));
   }
 
   private ReaderErrorReceived error(JsonNode json, String readerId) {
@@ -111,7 +111,7 @@ public class DevicePayloadAdapter {
     } catch (IllegalArgumentException exception) {
       throw new MalformedDevicePayloadException("Unknown error code " + json.path("code"));
     }
-    return new ReaderErrorReceived(readerId, type, required(json, "message"), instant(json, "occurredAt"));
+    return new ReaderErrorReceived(readerId, type, required(json, "message"), live(json, "occurredAt"));
   }
 
   private static void expectType(JsonNode json, String expected) {
@@ -140,5 +140,20 @@ public class DevicePayloadAdapter {
     } catch (DateTimeParseException exception) {
       throw new MalformedDevicePayloadException(field + " is not a UTC instant", exception);
     }
+  }
+
+  /**
+   * A message the reader sends as it happens (live tap, heartbeat, telemetry, error): the device time is validated
+   * but campus time is the clock's now. A device clock that drifts from real time (the Wokwi simulator runs slower
+   * than real time) would otherwise date every heartbeat further in the past, and with the simulated clock the
+   * reader would stay OFFLINE. Only a tap buffered offline needs its own time ({@link #instant}).
+   */
+  private LocalDateTime live(JsonNode json, String field) {
+    try {
+      Instant.parse(required(json, field));
+    } catch (DateTimeParseException exception) {
+      throw new MalformedDevicePayloadException(field + " is not a UTC instant", exception);
+    }
+    return clock.now();
   }
 }

@@ -51,7 +51,7 @@ class DevicePayloadAdapterTest {
   }
 
   @Test
-  void parse_tap_convertsTheInstantToCampusTimeAndNormalizesTheUid() {
+  void parse_liveTap_isStampedWithCampusNowAndNormalizesTheUid() {
     DeviceMessage message =
         parse(
             "tarjepafi.readers.RDR-A-301.tap",
@@ -66,13 +66,13 @@ class DevicePayloadAdapterTest {
                 "8f0c-1",
                 "RDR-A-301",
                 "04:3D:9B:12:8F",
-                LocalDateTime.parse("2026-11-15T10:04:05"),
+                LocalDateTime.parse("2026-10-07T09:50:00"),
                 TapSource.READER,
                 false));
   }
 
   @Test
-  void parse_bufferedTap_keepsTheFlag() {
+  void parse_bufferedTap_keepsTheFlagAndItsOwnTime() {
     TapReceived tap =
         (TapReceived)
             parse(
@@ -83,6 +83,7 @@ class DevicePayloadAdapterTest {
                 """);
 
     assertThat(tap.buffered()).isTrue();
+    assertThat(tap.tappedAt()).isEqualTo(LocalDateTime.parse("2026-11-15T10:04:05.123"));
   }
 
   @Test
@@ -113,7 +114,7 @@ class DevicePayloadAdapterTest {
 
     assertThat(telemetry.signalStrength()).isEqualTo(-48);
     assertThat(telemetry.uptime()).isEqualTo(1234);
-    assertThat(telemetry.capturedAt()).isEqualTo(LocalDateTime.parse("2026-11-15T10:04:30"));
+    assertThat(telemetry.capturedAt()).isEqualTo(LocalDateTime.parse("2026-10-07T09:50:00"));
   }
 
   @Test
