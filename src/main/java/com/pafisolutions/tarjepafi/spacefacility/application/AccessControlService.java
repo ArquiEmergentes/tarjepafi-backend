@@ -5,6 +5,7 @@ import com.pafisolutions.tarjepafi.credentials.application.CardHolderDirectoryPo
 import com.pafisolutions.tarjepafi.shared.application.IntegrationEvent;
 import com.pafisolutions.tarjepafi.shared.application.TapContext;
 import com.pafisolutions.tarjepafi.shared.application.TapResult;
+import com.pafisolutions.tarjepafi.spacefacility.application.ReservationService.TapDecision;
 import com.pafisolutions.tarjepafi.spacefacility.domain.model.AccessRecord;
 import com.pafisolutions.tarjepafi.spacefacility.domain.model.Space;
 import com.pafisolutions.tarjepafi.spacefacility.domain.model.WorkShift;
@@ -37,6 +38,7 @@ public class AccessControlService {
   private final WorkShiftRepository shifts;
   private final CardHolderDirectoryPort directory;
   private final AttendanceFacade attendance;
+  private final ReservationService reservations;
   private final ApplicationEventPublisher events;
 
   public AccessControlService(
@@ -45,12 +47,14 @@ public class AccessControlService {
       WorkShiftRepository shifts,
       CardHolderDirectoryPort directory,
       AttendanceFacade attendance,
+      ReservationService reservations,
       ApplicationEventPublisher events) {
     this.spaces = spaces;
     this.accessRecords = accessRecords;
     this.shifts = shifts;
     this.directory = directory;
     this.attendance = attendance;
+    this.reservations = reservations;
     this.events = events;
   }
 
@@ -109,10 +113,70 @@ public class AccessControlService {
 
   /** Access to a space: maintenance denies; then the card's own rule, then the roles of the space. */
   private TapResult spaceAccess(TapContext tap, Space space) {
+    if (ReservationService.RESERVATION_REQUIRED.equals(space.getAccessPolicy())) {
+      return reservationAccess(tap, space);
+    }
     boolean granted = decide(tap, space);
     return granted
         ? TapResult.access("success", "tap.accessGranted")
         : TapResult.rejected("tap.accessDenied");
+  }
+
+  /**
+   * A space that is entered with a reservation (TS22): the holder's tap checks their reservation in during the 10
+   * minutes after its start. Anything else leaves a denied access record with the reason.
+   */
+  private TapResult reservationAccess(TapContext tap, Space space) {
+    if (space.isInMaintenance()) {
+      saveReservationAccess(tap, space, false, "SPACE_IN_MAINTENANCE");
+      return TapResult.rejected("tap.accessDenied");
+    }
+    TapDecision decision = reservations.onTap(space, tap.cardHolderId(), tap.at());
+    return switch (decision.outcome()) {
+      case CHECKED_IN -> {
+        saveReservationAccess(tap, space, true, "NONE");
+        yield new TapResult(
+            "ACCESS",
+            "success",
+            "tap.reservationActivated",
+            Map.of(
+                "space", space.getName(),
+                "until", decision.reservation().getEndTime().toLocalTime().toString()));
+      }
+      case ALREADY_ACTIVE -> {
+        saveReservationAccess(tap, space, true, "NONE");
+        yield new TapResult("ACCESS", "info", "tap.reservationAlreadyActive", Map.of());
+      }
+      case NOT_STARTED -> {
+        saveReservationAccess(tap, space, false, "RESERVATION_NOT_STARTED");
+        yield new TapResult(
+            "REJECTED",
+            "error",
+            "tap.reservationNotStarted",
+            Map.of("start", decision.reservation().getStartTime().toLocalTime().toString()));
+      }
+      case EXPIRED -> {
+        saveReservationAccess(tap, space, false, "RESERVATION_EXPIRED");
+        yield TapResult.rejected("tap.reservationExpired");
+      }
+      case NO_RESERVATION -> {
+        saveReservationAccess(tap, space, false, "NO_RESERVATION");
+        yield TapResult.rejected("tap.noReservation");
+      }
+    };
+  }
+
+  private void saveReservationAccess(TapContext tap, Space space, boolean granted, String denial) {
+    saveAccess(
+        tap.tapEventId(),
+        tap.cardUid(),
+        tap.credentialId(),
+        tap.cardHolderId(),
+        space,
+        tap.readerId(),
+        tap.at(),
+        granted,
+        denial);
   }
 
   /** Turnstile: staff open and close their shift; students and teachers only leave an access record. */

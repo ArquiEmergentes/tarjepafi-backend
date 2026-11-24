@@ -84,6 +84,7 @@ Backend app settings (names only; values come from Neon and the password manager
 |---|---|
 | `WEBSITES_PORT` | `8080` |
 | `SPRING_PROFILES_ACTIVE` | `demo` (simulated clock and the demo seed; `dev` must **not** be active) |
+| `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` | Optional (phase 8): the SMTP server for the e-mail of a released reservation. Without a host the e-mail is only logged. Locally `docker compose up -d` starts Mailpit (SMTP 1025, inbox http://localhost:8025). |
 | `TARJEPAFI_DEMO_WOKWI_TAGS` | `true` to re-point the demo cards at the Wokwi preset tags (Blue `01:02:03:04` student U202312966, NFC Tag `04:11:22:33` teacher D0001 (the part is documented with 7 bytes but the simulated reader returns 4), Green `11:22:33:44` staff T0001, Yellow `55:66:77:88` blocked card; Red and Key Fob stay unregistered). The old seed UIDs stop working while it is on. Default off. |
 | `JWT_SECRET` | 32+ random bytes |
 | `DB_URL` | `jdbc:postgresql://<neon-direct-host>/<db>?sslmode=require` |

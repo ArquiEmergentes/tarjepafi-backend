@@ -40,6 +40,11 @@ public final class DisplayMessages {
           Map.entry("tap.shiftAlreadyOpen", "Tu jornada ya está abierta"),
           Map.entry("tap.shiftClosed", "Salida registrada · {{worked}} trabajadas"),
           Map.entry("tap.noEntryFound", "No se encontró una entrada registrada"),
+          Map.entry("tap.reservationActivated", "Reserva activada · {{space}} · hasta las {{until}}"),
+          Map.entry("tap.reservationAlreadyActive", "Tu reserva ya está activa"),
+          Map.entry("tap.reservationNotStarted", "Tu reserva aún no comienza · inicia a las {{start}}"),
+          Map.entry("tap.reservationExpired", "Reserva vencida · pasaron los 10 minutos de tolerancia"),
+          Map.entry("tap.noReservation", "No tienes una reserva activa para este espacio"),
           Map.entry("tap.duplicateEvent", "Evento ya procesado · no se registró de nuevo"),
           Map.entry("tap.received", "Lectura recibida"));
 

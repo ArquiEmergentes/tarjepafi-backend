@@ -29,7 +29,7 @@ public class SpaceManagementService {
           "STUDY_CUBICLE",
           "EVENT_VENUE");
   public static final Set<String> STATUSES = Set.of("AVAILABLE", "MAINTENANCE");
-  public static final Set<String> POLICIES = Set.of("OPEN", "RESTRICTED");
+  public static final Set<String> POLICIES = Set.of("OPEN", "RESTRICTED", "RESERVATION_REQUIRED");
   public static final Set<String> ROLES = Set.of("STUDENT", "TEACHER", "STAFF");
 
   private final SpaceRepository spaces;
