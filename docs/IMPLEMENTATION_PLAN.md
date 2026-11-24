@@ -175,6 +175,12 @@ type (`CONNECTIVITY_FAILURE`, `READ_ERROR`, `DEVICE_OFFLINE`, `CONFIGURATION_ERR
 payload accepts an optional `"source": "SIMULATOR"` (the API's simulated taps use it; readers omit it). The `readerId`
 of the payload must equal the one in the topic, and every payload needs `"v": 1`.
 
+Phase 6 firmware notes (additive, nothing the backend has to change): every reader message is published with QoS 1,
+instants carry milliseconds (`2026-11-15T15:04:05.123Z`, which `Instant.parse` accepts), and `TelemetryCaptured`
+carries an optional `droppedCount` (taps lost because the offline buffer was full; the backend ignores unknown fields
+today). **Gap found in phase 6:** the backend reads `buffered` from the tap payload but does not store or expose it, so
+step 6 of the demo script cannot yet prove `buffered: true` through the API.
+
 Broker → reader, topic `tarjepafi/readers/{readerId}/display`:
 
 ```json
@@ -256,6 +262,10 @@ milestone **M3** is the script passing with the API reads (Swagger UI or `docs/h
   they have. Seed cards use 5-byte UIDs (`04:3D:9B:12:8F`); real MIFARE UIDs are 4 or 7 bytes, so the demo seed
   gets an overlay that registers the Wokwi tag UIDs as credentials of the demo holders (student `U202312966`,
   teacher `D0001`, staff `T0001`, one blocked card, one unregistered).
+  Found in phase 6 (Wokwi docs): click the part to open its panel, pick a card and press Tap (500 ms) or Hold. Presets:
+  Blue `01:02:03:04` (UID settable with the part's `uid` attribute), Green `11:22:33:44`, Yellow `55:66:77:88`,
+  Red `AA:BB:CC:DD`, NFC Tag `04:11:22:33:44:55:66` (7 bytes), Key Fob `C0:FF:EE:99`. All fit the backend's UID
+  format (4 to 7 bytes).
 - **Time.** The reader stamps real UTC time from NTP; the deployed backend runs with the simulated campus clock
   (D8), which maps device time onto campus time. The presenter moves the clock from the frontend (or Swagger UI).
 - **Offline.** Wokwi cannot drop Wi-Fi on demand, so the circuit has a slide switch that forces offline mode

@@ -1,0 +1,6 @@
+# Wokwi VS Code extension: runs the PlatformIO build (`pio run` in this folder).
+# wokwi.com does not use this file; it compiles sketch.ino and the .h/.cpp tabs itself.
+[wokwi]
+version = 1
+firmware = '.pio/build/reader-esp32/firmware.bin'
+elf = '.pio/build/reader-esp32/firmware.elf'

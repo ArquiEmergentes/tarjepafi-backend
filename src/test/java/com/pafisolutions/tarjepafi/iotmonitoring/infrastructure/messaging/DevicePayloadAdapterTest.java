@@ -67,7 +67,22 @@ class DevicePayloadAdapterTest {
                 "RDR-A-301",
                 "04:3D:9B:12:8F",
                 LocalDateTime.parse("2026-11-15T10:04:05"),
-                TapSource.READER));
+                TapSource.READER,
+                false));
+  }
+
+  @Test
+  void parse_bufferedTap_keepsTheFlag() {
+    TapReceived tap =
+        (TapReceived)
+            parse(
+                "tarjepafi.readers.RDR-A-301.tap",
+                """
+                {"v":1,"type":"CardTapped","eventId":"e2","readerId":"RDR-A-301",
+                 "cardUid":"01:02:03:04","tappedAt":"2026-11-15T15:04:05.123Z","buffered":true}
+                """);
+
+    assertThat(tap.buffered()).isTrue();
   }
 
   @Test

@@ -128,7 +128,8 @@ public final class IotResources {
       String messageKey,
       Map<String, Object> messageParams,
       String displayMessage,
-      String source) {
+      String source,
+      boolean buffered) {
 
     private static final TypeReference<Map<String, Object>> PARAMS = new TypeReference<>() {};
 
@@ -152,7 +153,8 @@ public final class IotResources {
           event.getMessageKey(),
           params,
           event.getDisplayMessage(),
-          event.getSource().name());
+          event.getSource().name(),
+          event.isBuffered());
     }
   }
 
