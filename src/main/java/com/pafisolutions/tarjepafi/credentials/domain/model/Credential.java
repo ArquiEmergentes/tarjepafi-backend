@@ -97,6 +97,11 @@ public class Credential {
     return id;
   }
 
+  /** Demo seed only: points the card of this holder at another physical tag. */
+  public void reassignCardUid(String newCardUid) {
+    this.cardUid = newCardUid;
+  }
+
   public String getCardUid() {
     return cardUid;
   }

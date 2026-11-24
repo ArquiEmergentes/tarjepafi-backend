@@ -230,7 +230,7 @@ sends something), a tap from an unregistered reader (`CONFIGURATION_ERROR`) or f
 
 ### Tap events and polling
 
-`TapEvent`: `{ id, cursor, readerId, cardUid, tappedAt, outcome, tone, messageKey, messageParams, displayMessage, source }`.
+`TapEvent`: `{ id, cursor, readerId, cardUid, tappedAt, outcome, tone, messageKey, messageParams, displayMessage, source, buffered }`.
 `outcome`: `PENDING` (not resolved yet), `ATTENDANCE`, `ACCESS`, `WORK_SHIFT`, `REJECTED`. `tone`: `success`, `info`,
 `error` (null while `PENDING`). `displayMessage` is the Spanish text the reader showed; `messageKey` (`tap.*`) and
 `messageParams` let you translate it yourself. `source`: `READER` or `SIMULATOR`. `cardUid` looks like `04:3D:9B:12:8F`.
@@ -359,3 +359,4 @@ Request examples that run against any environment: `docs/http/iam.http`.
 - 2026-11-24 · IoT section (readers, incidents, tap events with polling, simulated taps), verified on the deployed API and **frozen**: from now on only additive changes, announced here. Until phase 5 every valid tap resolves as `ACCESS` / `tap.received`; `outcome`, `tone`, `messageKey` and `displayMessage` of those events will change when the attendance and access rules arrive.
 - 2026-11-23 · Credentials section (cards, card holders, permissions, enrollment verification, settings, catalogues), verified on the deployed API and **frozen**: from now on only additive changes, announced here.
 - 2026-11-24 · Attendance and space access sections (phase 5): teacher routes under `/class-sessions`, `/access-records`, `/work-shifts`, space management and occupancy, campus presences. Verified on the deployed API and **frozen**. A tap that writes records may take more than 3 seconds to resolve on the deployed stack: `POST /iot/readers/{id}/taps` then answers `202` with the event `PENDING`; poll `GET /iot/tap-events/{id}`. **Behaviour change of the frozen IoT section:** valid taps no longer resolve as `ACCESS` / `tap.received`; `outcome`, `tone`, `messageKey` and `displayMessage` now come from the attendance and access rules (the shape of `TapEvent` did not change). `POST /spaces` and `PATCH /spaces/**` are new admin-only routes next to the open `GET`s.
+- 2026-11-24 · Additive: `TapEvent.buffered` (boolean, true when the reader stored the tap while offline and sent it afterwards; false for simulated and live taps). New Swagger "Authorize" button for the bearer token.

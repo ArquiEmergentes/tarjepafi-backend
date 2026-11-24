@@ -56,6 +56,10 @@ public class CardTapEvent {
   @Column(nullable = false)
   private TapSource source;
 
+  /** True when the reader stored the tap while offline and sent it afterwards. */
+  @Column(nullable = false)
+  private boolean buffered;
+
   protected CardTapEvent() {}
 
   public CardTapEvent(
@@ -66,6 +70,17 @@ public class CardTapEvent {
     this.tappedAt = tappedAt;
     this.source = source;
     this.outcome = TapOutcome.PENDING;
+  }
+
+  public CardTapEvent(
+      String id,
+      String readerId,
+      String cardUid,
+      LocalDateTime tappedAt,
+      TapSource source,
+      boolean buffered) {
+    this(id, readerId, cardUid, tappedAt, source);
+    this.buffered = buffered;
   }
 
   /** Seed and history rows come with their result already known. */
@@ -158,6 +173,10 @@ public class CardTapEvent {
 
   public String getDisplayMessage() {
     return displayMessage;
+  }
+
+  public boolean isBuffered() {
+    return buffered;
   }
 
   public TapSource getSource() {

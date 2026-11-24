@@ -80,7 +80,8 @@ public class DevicePayloadAdapter {
       throw new MalformedDevicePayloadException("cardUid is not a valid UID");
     }
     TapSource source = "SIMULATOR".equals(text(json, "source")) ? TapSource.SIMULATOR : TapSource.READER;
-    return new TapReceived(eventId, readerId, uid, instant(json, "tappedAt"), source);
+    return new TapReceived(eventId, readerId, uid, instant(json, "tappedAt"), source,
+        json.path("buffered").asBoolean(false));
   }
 
   private TelemetryReceived telemetry(JsonNode json, String readerId) {

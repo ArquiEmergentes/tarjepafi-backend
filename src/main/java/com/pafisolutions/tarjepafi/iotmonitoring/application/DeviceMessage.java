@@ -12,9 +12,15 @@ public sealed interface DeviceMessage {
 
   String readerId();
 
-  /** A card was read. {@code eventId} is unique per tap and makes delivery idempotent. */
+  /** A card was read. {@code eventId} is unique per tap and makes delivery idempotent;
+   * {@code buffered} is true when the reader kept the tap while offline and sent it later. */
   record TapReceived(
-      String eventId, String readerId, String cardUid, LocalDateTime tappedAt, TapSource source)
+      String eventId,
+      String readerId,
+      String cardUid,
+      LocalDateTime tappedAt,
+      TapSource source,
+      boolean buffered)
       implements DeviceMessage {}
 
   /** Periodic telemetry; it also counts as a heartbeat. */

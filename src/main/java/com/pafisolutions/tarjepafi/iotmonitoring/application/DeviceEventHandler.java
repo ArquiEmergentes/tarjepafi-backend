@@ -82,7 +82,7 @@ public class DeviceEventHandler {
     }
     CardTapEvent event =
         new CardTapEvent(
-            message.eventId(), message.readerId(), message.cardUid(), message.tappedAt(), message.source());
+            message.eventId(), message.readerId(), message.cardUid(), message.tappedAt(), message.source(), message.buffered());
     Optional<Reader> found = readers.findById(message.readerId());
     if (found.isEmpty()) {
       incidents.openIfAbsent(

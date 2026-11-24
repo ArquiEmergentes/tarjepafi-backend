@@ -84,6 +84,7 @@ Backend app settings (names only; values come from Neon and the password manager
 |---|---|
 | `WEBSITES_PORT` | `8080` |
 | `SPRING_PROFILES_ACTIVE` | `demo` (simulated clock and the demo seed; `dev` must **not** be active) |
+| `TARJEPAFI_DEMO_WOKWI_TAGS` | `true` to re-point the demo cards at the Wokwi preset tags (Blue `01:02:03:04` student U202312966, NFC Tag `04:11:22:33:44:55:66` teacher D0001, Green `11:22:33:44` staff T0001, Yellow `55:66:77:88` blocked card; Red and Key Fob stay unregistered). The old seed UIDs stop working while it is on. Default off. |
 | `JWT_SECRET` | 32+ random bytes |
 | `DB_URL` | `jdbc:postgresql://<neon-direct-host>/<db>?sslmode=require` |
 | `DB_USERNAME`, `DB_PASSWORD` | from Neon |
