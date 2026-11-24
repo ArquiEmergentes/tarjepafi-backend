@@ -65,7 +65,7 @@ Roles: `ADMIN`, `TEACHER`, `STAFF`, `STUDENT`. Statuses: `ACTIVE`, `INACTIVE`, `
             "cardHolderId": null, "fullName": "…", "createdAt": "2026-…", "updatedAt": "2026-…" } }
 ```
 
-Errors: `400 VALIDATION_FAILED`, `400 INVALID_EMAIL`, `401 INVALID_CREDENTIALS`, `403 ACCOUNT_DISABLED`.
+Errors: `400 VALIDATION_FAILED`, `400 INVALID_EMAIL`, `401 INVALID_CREDENTIALS`, `403 ACCOUNT_DISABLED`, `429 TOO_MANY_ATTEMPTS`: 5 failed attempts for an e-mail (or 30 from one address) lock it for 5 minutes, even for the right password; the answer has the `Retry-After` header and `retryAfterSeconds` (seconds to wait). A successful sign-in clears the failures of that e-mail.
 The password is never returned. Do not store it; store `token` and `user`.
 
 ### `GET /auth/me`
@@ -437,3 +437,4 @@ Request examples that run against any environment: `docs/http/iam.http`.
 - 2026-11-24 · Behaviour fix (no shape change): live reader messages (taps with `buffered: false`, heartbeat, telemetry, error) are stamped with the campus clock's now instead of the device time. A device clock that drifts from real time (the Wokwi simulator runs slower) used to date heartbeats further and further in the past, so with the simulated clock the reader stayed `OFFLINE` after a clock move. Only taps with `buffered: true` keep their own time, converted to campus time.
 - 2026-11-24 · Data management section (phase 7): `GET /data-records`, `GET /dashboard`, `POST /reports/{weekly|monthly|semester}` (202, polling), `GET /reports`, `GET /reports/{id}`. Verified on the deployed API and **frozen**: from now on only additive changes, announced here.
 - 2026-11-24 · Reservations section (phase 8): `POST /spaces/{id}/reservations`, `POST /reservations/{id}/cancel`, `GET /reservations/{id}`, `GET /reservations/active`, `GET /spaces/{id}/reservations`. Additive changes to frozen sections: space `status` can be `OCCUPIED`, `accessPolicy` can be `RESERVATION_REQUIRED`, access records have three new `denialReason` values, and the demo seed has a reader `RDR-K-003` at the cubicle. Verified on the deployed API and **frozen**: from now on only additive changes, announced here.
+- 2026-11-24 · Additive (phase 9): `POST /auth/sign-in` can answer `429 TOO_MANY_ATTEMPTS` with a `Retry-After` header after repeated failed attempts. The role matrix of every route is in `docs/ROLE_MATRIX.md` and is checked by a test; no route changed its access.

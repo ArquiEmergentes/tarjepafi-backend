@@ -28,7 +28,9 @@ public class TapResolvedConsumer {
     this.mapper = mapper;
   }
 
-  @RabbitListener(queues = IotMessagingTopology.TAP_RESOLVED_QUEUE)
+  @RabbitListener(
+      queues = IotMessagingTopology.TAP_RESOLVED_QUEUE,
+      concurrency = "${tarjepafi.amqp.concurrency.tap-resolved:2-4}")
   public void onMessage(Message message) {
     JsonNode data;
     try {

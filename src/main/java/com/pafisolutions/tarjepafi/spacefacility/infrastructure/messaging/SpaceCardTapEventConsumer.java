@@ -46,7 +46,7 @@ public class SpaceCardTapEventConsumer {
         Topology.bind(queue, MessagingConfiguration.EVENTS_EXCHANGE, "iot.tap-rejected"));
   }
 
-  @RabbitListener(queues = QUEUE)
+  @RabbitListener(queues = QUEUE, concurrency = "${tarjepafi.amqp.concurrency.space-card-tap:2-4}")
   @SuppressWarnings("unchecked")
   public void onMessage(Message message) {
     Map<String, Object> envelope = mapper.readValue(message.getBody(), MESSAGE);

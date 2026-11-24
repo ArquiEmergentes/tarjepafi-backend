@@ -87,6 +87,9 @@ Backend app settings (names only; values come from Neon and the password manager
 | `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` | Optional (phase 8): the SMTP server for the e-mail of a released reservation. Without a host the e-mail is only logged. Locally `docker compose up -d` starts Mailpit (SMTP 1025, inbox http://localhost:8025). |
 | `TARJEPAFI_DEMO_WOKWI_TAGS` | `true` to re-point the demo cards at the Wokwi preset tags (Blue `01:02:03:04` student U202312966, NFC Tag `04:11:22:33` teacher D0001 (the part is documented with 7 bytes but the simulated reader returns 4), Green `11:22:33:44` staff T0001, Yellow `55:66:77:88` blocked card; Red and Key Fob stay unregistered). The old seed UIDs stop working while it is on. Default off. |
 | `JWT_SECRET` | 32+ random bytes |
+| `DB_POOL_SIZE` | Database connections of the app; 10 by default since phase 9 (the consumers of the taps run several at a time). |
+| `TARJEPAFI_AMQP_CONCURRENCY_DEVICE_EVENTS`, `..._TAP_RESOLVED`, `..._SPACE_CARD_TAP`, `..._DATA_EVENTS`, `..._ATTENDANCE_CARD_TAP` | Optional: consumers per queue as `min-max` (defaults 4-8, 2-4, 2-4, 2-4 and 1). See `docs/PERFORMANCE.md`. |
+| `TARJEPAFI_SECURITY_SIGN_IN_MAX_FAILURES_PER_EMAIL`, `..._MAX_FAILURES_PER_CLIENT`, `..._WINDOW_SECONDS`, `..._LOCK_SECONDS` | Optional: the sign-in lock (defaults 5, 30, 900 and 300). |
 | `DB_URL` | `jdbc:postgresql://<neon-direct-host>/<db>?sslmode=require` |
 | `DB_USERNAME`, `DB_PASSWORD` | from Neon |
 | `RABBITMQ_HOST` | the ACI DNS name above |
