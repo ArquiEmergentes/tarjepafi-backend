@@ -1,0 +1,57 @@
+### Data management requests (phase 7). Works with the VS Code "REST Client" extension and the IntelliJ HTTP client.
+### Needs the ADMIN role. The demo seed brings 503 facts (5 to 7 October 2026) and three reports; run docs/http/demo.http
+### first if you want live facts in them too.
+@host = https://tarjepafi-api-pafi7k2.azurewebsites.net
+# @host = http://localhost:8080
+@adminEmail = admin@upc.edu.pe
+@adminPassword = Admin123*
+
+### 0. Sign in as administrator (the deployed demo uses another password: ask the backend owner)
+# @name signIn
+POST {{host}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{ "email": "{{adminEmail}}", "password": "{{adminPassword}}" }
+
+###
+@token = {{signIn.response.body.$.token}}
+
+### 1. The facts, newest first. Filters: type, source, subjectId, from, to. Poll with after=<nextCursor>
+GET {{host}}/api/v1/data-records?limit=10
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/data-records?type=ACCESS&from=2026-10-06T00:00:00&to=2026-10-06T23:59:59
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/v1/data-records?type=DEVICE_TELEMETRY&source=IOT_MONITORING&subjectId=RDR-T-002
+Authorization: Bearer {{token}}
+
+### 2. Dashboard of a day (default: today by the campus clock). Demo day: 2026-10-06
+GET {{host}}/api/v1/dashboard?date=2026-10-06
+Authorization: Bearer {{token}}
+
+### 3. Request a report: 202 GENERATING. Weekly report of the demo week; the seed gives
+###    totalRecords 497, attendanceRate 77.5, accessGranted 104, accessDenied 15, peakHour 07:00, readersWithIncidents 7
+# @name weekly
+POST {{host}}/api/v1/reports/weekly
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "periodStart": "2026-10-05", "periodEnd": "2026-10-11" }
+
+###
+@reportId = {{weekly.response.body.$.id}}
+
+### 4. Poll it until status is GENERATED (about 2 seconds), then read the figures per day
+GET {{host}}/api/v1/reports/{{reportId}}
+Authorization: Bearer {{token}}
+
+### 5. Without a body: the period that contains today by the campus clock (monthly, semester work the same)
+POST {{host}}/api/v1/reports/monthly
+Authorization: Bearer {{token}}
+
+### 6. All the reports (GENERATING first); errors: 400 INVALID_PERIOD (start after end), 400 INVALID_REPORT_TYPE, 404 REPORT_NOT_FOUND
+GET {{host}}/api/v1/reports
+Authorization: Bearer {{token}}
