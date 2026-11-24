@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TelemetryRepository extends JpaRepository<TelemetrySample, String> {
 
-  List<TelemetrySample> findByReaderIdOrderByCapturedAtDescIdDesc(String readerId, Pageable page);
+  List<TelemetrySample> findByReaderIdOrderByCapturedAtDescSeqDesc(String readerId, Pageable page);
 }
