@@ -38,17 +38,19 @@ How to use this file:
   tap-resolved consumer with the display reply, the temporary fallback resolver, polling endpoints and simulated taps.
   116 tests green on JDK 25. `docs/API.md` has the IoT section and `docs/http/iot.http` exists.
 - **Phase 5 is deployed and verified (2026-11-24)**, PR #8.
-- **Phase 6 started (2026-11-24)** on `feature/wokwi-reader-firmware`, uncommitted: `firmware/reader-esp32/` holds
-  steps 6.1 to 6.5 written but **not compiled or run yet** (no PlatformIO or Arduino CLI on this machine).
-  `firmware/mqtt-smoke-test/` is the minimal sketch that proved Wokwi reaches the ACI broker as `reader-demo` with a
-  `Heartbeat` (after the `reader-demo` password was reset). `.gitignore` now also ignores a flat `firmware/**/config.h`.
+- **Phase 6 firmware runs on the deployed API (2026-11-24)**, branch `feature/wokwi-reader-firmware`. `firmware/reader-esp32/`
+  ran on wokwi.com against the deployed backend: demo steps 1 to 7 passed by hand (reader ACTIVE, clock 10:00, teacher
+  arrival, student attendance, blocked card, offline switch with `buffered: true` and an emptied buffer, API tap as plan B).
+  Backend changes made for it: `buffered` stored and exposed (`V9`), live device messages stamped with campus now,
+  telemetry ordered by `seq` (`V10`), Wokwi tag overlay `WokwiTagSeeder` (`TARJEPAFI_DEMO_WOKWI_TAGS=true`, set on the
+  App Service), the Swagger "Authorize" button. Still open: 6.7 to 6.9 and the Verify block (clean rehearsal twice from
+  the public Wokwi URL).
 
 ## Next step
 
-1. Phase 6: load `firmware/reader-esp32/` into a wokwi.com ESP32 project (README), fix whatever does not compile, then
-   check 6.2 to 6.5 there (tap round trip, timeout, offline switch, flush in order) and tick them. Then 6.6: the seed
-   overlay with the Wokwi card UIDs (plan section 6) and the backend storing/exposing `buffered` (gap in plan section 4),
-   redeploy.
+1. Phase 6: reset the demo data and restart the app, run the demo script twice from the saved public wokwi.com project
+   (6.7, 6.8; rotate the `reader-demo` password afterwards, the project shows it), hand the Wokwi URL and the tag table to
+   the frontend owner (6.9), then tick the Verify block.
 2. Hand the frontend owner the deployed URL, Swagger UI and `docs/API.md` (plan section 8) and ask for their origins
    (`CORS_ALLOWED_ORIGINS`); today only `http://localhost:4200` is allowed. IAM, credentials and IoT are frozen.
 3. Small debts: Swagger request/response examples for IAM, credentials and IoT (D14).
@@ -117,12 +119,12 @@ How to use this file:
 - [x] Verify block passed (milestone M2, 2026-11-24, deployed: 17 checks of the demo walkthrough through the API, 16 passed and the 17th was the script tapping a reader the clock jump had made OFFLINE, which is the documented behaviour). Local: `TapResolutionApiTests` (6) replay the demo walkthrough and acceptance 01 to 04 and 07 against real PostgreSQL and RabbitMQ, 132 tests green; still to run on the deployed API through `demo.http`
 
 ### Phase 6 · Wokwi firmware and the live showcase
-- [ ] 6.1 Project files and circuit
-- [ ] 6.2 Modules
-- [ ] 6.3 Tap flow
-- [ ] 6.4 Buffer flush on reconnect
-- [ ] 6.5 Offline switch
-- [ ] 6.6 Wokwi tag UIDs in the seed overlay
+- [x] 6.1 Project files and circuit
+- [x] 6.2 Modules
+- [x] 6.3 Tap flow
+- [x] 6.4 Buffer flush on reconnect
+- [x] 6.5 Offline switch
+- [x] 6.6 Wokwi tag UIDs in the seed overlay
 - [ ] 6.7 Public wokwi.com project saved, URL documented
 - [ ] 6.8 Demo script rehearsed twice
 - [ ] 6.9 Wokwi URL and tag table handed to the frontend owner
@@ -326,4 +328,18 @@ How to use this file:
   first; a reply up to 15 s late is still shown because the deployed backend can take more than 3 s; the MQTT client id
   gets a random suffix (Wokwi gives every ESP32 the same MAC). The backend ignores `buffered` (not stored, not exposed),
   so demo step 6 needs a small backend change.
+- 2026-11-24 · Phase 6 manual run (wokwi.com against the deployed API). Steps 1 to 7 of the demo script passed. Things found and fixed:
+  (1) the simulator runs at about half of real time, so the reader's clock drifted from the server's and, with the
+  non-ticking simulated campus clock, every heartbeat was dated further in the past: the reader stayed OFFLINE after a clock
+  move. The backend now stamps live messages (taps with `buffered: false`, heartbeat, telemetry, error) with campus now and
+  only a buffered tap keeps its own time (`DevicePayloadAdapter`); consequence: telemetry samples of one second tie, so they
+  are ordered by an insertion `seq` (`V10`). (2) the same slowness made the 30 s MQTT keep-alive last more than 45 s of real
+  time, so RabbitMQ dropped the reader about every 70 s: the firmware keep-alive is 6 s. (3) the simulated MFRC522 returns
+  the NFC Tag as `04:11:22:33` (4 bytes), not the 7 bytes in Wokwi's docs: the seed registers that. (4) the Wokwi tap button
+  was not usable with the slide switch to the right: typing `o` in the serial monitor toggles forced offline too. (5) the
+  backend stores `buffered` (`V9`) and `TapEvent.buffered` is in the API (additive). (6) the seed overlay maps Blue
+  `01:02:03:04` to student U202312966, NFC Tag `04:11:22:33` to teacher D0001, Green `11:22:33:44` to staff T0001, Yellow
+  `55:66:77:88` to a BLOCKED card (reply "Tarjeta inactiva", not "Tarjeta bloqueada"), Red and Key Fob unregistered; the old
+  seed UIDs stop working while `TARJEPAFI_DEMO_WOKWI_TAGS` is true. Reply texts differ from the plan's table: "Llegada
+  registrada" (not "Clase iniciada"). After a restart the API answers about 2 minutes before the seed finishes.
 

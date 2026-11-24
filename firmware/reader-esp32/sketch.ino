@@ -38,6 +38,7 @@ bool announcePending = false;   // a new MQTT session that has not sent its hear
 bool hardwareErrorPending = false;
 uint64_t hardwareErrorAtMs = 0;
 
+bool serialOffline = false;  // typed 'o' in the serial monitor: same effect as the slide switch
 bool switchRaw = false;
 bool switchStable = false;
 unsigned long switchChangedAt = 0;
@@ -64,7 +65,7 @@ bool offlineSwitchOn() {
 }
 
 void readOfflineSwitch(unsigned long now) {
-  bool raw = offlineSwitchOn();
+  bool raw = offlineSwitchOn() || serialOffline;
   if (raw != switchRaw) {
     switchRaw = raw;
     switchChangedAt = now;
@@ -72,6 +73,18 @@ void readOfflineSwitch(unsigned long now) {
   if (switchRaw != switchStable && now - switchChangedAt >= settings::SWITCH_DEBOUNCE_MS) {
     switchStable = switchRaw;
     network.setForcedOffline(switchStable);
+  }
+}
+
+// The Wokwi tap button can be unavailable while the slide switch is moved: typing 'o' in the serial monitor toggles
+// the forced offline mode too.
+void readSerialCommands() {
+  while (Serial.available() > 0) {
+    int c = Serial.read();
+    if (c == 'o' || c == 'O') {
+      serialOffline = !serialOffline;
+      Serial.printf("[net] serial command: forced offline %s\n", serialOffline ? "ON" : "OFF");
+    }
   }
 }
 
@@ -185,13 +198,14 @@ void setup() {
   }
 
   network.begin(onDeviceMessage);
-  switchRaw = switchStable = offlineSwitchOn();
+  switchRaw = switchStable = offlineSwitchOn() || serialOffline;
   network.setForcedOffline(switchStable);
 }
 
 void loop() {
   unsigned long now = millis();
 
+  readSerialCommands();
   readOfflineSwitch(now);
   network.loop(now);
   if (network.consumeReconnected()) {

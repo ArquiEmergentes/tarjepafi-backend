@@ -41,7 +41,10 @@ constexpr unsigned long TELEMETRY_INTERVAL_MS = 30000;
 
 // MQTT. The ACI broker has answered CONNACK after about 3 s, so the 1 s library default is too short.
 constexpr unsigned long MQTT_COMMAND_TIMEOUT_MS = 10000;
-constexpr int MQTT_KEEP_ALIVE_S = 30;
+// Short on purpose: the Wokwi simulator runs at roughly half of real time, so a 30 s keep-alive of the simulated
+// ESP32 is more than a minute for the broker, which closes a silent session after 1.5 x the keep-alive (seen in
+// the broker log as a reconnection about every 70 s).
+constexpr int MQTT_KEEP_ALIVE_S = 6;
 constexpr unsigned long MQTT_BACKOFF_MIN_MS = 1000;
 constexpr unsigned long MQTT_BACKOFF_MAX_MS = 30000;
 constexpr unsigned long WIFI_RETRY_INTERVAL_MS = 15000;
