@@ -1,5 +1,8 @@
 # Performance evidence (phase 9, QAS01 and QAS02)
 
+> The class decided on 2026-11-25 that the quality scenarios are not evaluated. This is kept as information: the numbers
+> below were measured, the deployed demo was not tuned further and its database stays in `us-east-2`.
+
 | QAS | Requirement | Where it holds |
 |---|---|---|
 | QAS01 | a card reading is confirmed (display reply) within 1 second | locally, with margin (p95 37 ms); **not on the deployed demo** (see below) |

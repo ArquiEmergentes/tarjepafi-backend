@@ -1,6 +1,6 @@
 # TarjePAFI API · frontend guide
 
-Contract for the person building the frontend. It grows one context per phase; a phase's section is **frozen** once it is
+Start with `docs/FRONTEND_HANDOFF.md` (reading order, screens, live data, the Wokwi demo, limits). This file is the contract for the person building the frontend. It grows one context per phase; a phase's section is **frozen** once it is
 verified on the deployed API (plan D14): later changes are additive, or announced in the changelog at the end.
 
 ## Where
