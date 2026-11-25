@@ -1,5 +1,6 @@
 package com.pafisolutions.tarjepafi.shared.interfaces.rest;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.pafisolutions.tarjepafi.shared.application.CampusClock;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -20,9 +21,9 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/v1/simulation/clock")
 public class SimulationClockController {
 
-  public record ClockResource(LocalDateTime now, boolean simulated) {}
+  public record ClockResource(@Schema(example = "2026-10-07T09:50:00") LocalDateTime now, @Schema(example = "true") boolean simulated) {}
 
-  public record MoveClockResource(@NotNull LocalDateTime now) {}
+  public record MoveClockResource(@Schema(example = "2026-10-07T10:00:00") @NotNull LocalDateTime now) {}
 
   private final CampusClock clock;
 

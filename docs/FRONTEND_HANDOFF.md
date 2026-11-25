@@ -132,7 +132,7 @@ by the Wokwi ones for the demo student, teacher, staff and blocked card.
 - **No push.** No WebSocket or SSE; polling is the contract. If polling is not enough on a screen, ask: a stream can be added (additive).
 - **No refresh token, no logout call:** drop the token on the client.
 - **No CSV or PDF export:** build it from the JSON (the web app did the same for reports).
-- **Swagger has summaries, descriptions and error codes, but not request and response examples for every route:** use `docs/API.md` and the `.http` files.
+- **Swagger has an example for every field of every request and response** (Try it out fills a ready body), the `Problem` shape of the errors on every route and the error codes in each description; `docs/API.md` and the `.http` files add the flows.
 
 ## 8. Watch out for
 

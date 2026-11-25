@@ -1,5 +1,6 @@
 package com.pafisolutions.tarjepafi.iotmonitoring.interfaces.rest;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.pafisolutions.tarjepafi.iotmonitoring.domain.model.CardTapEvent;
 import com.pafisolutions.tarjepafi.iotmonitoring.domain.model.DeviceType;
 import com.pafisolutions.tarjepafi.iotmonitoring.domain.model.Incident;
@@ -22,7 +23,7 @@ public final class IotResources {
   private IotResources() {}
 
   public record ConfigurationResource(
-      String readerMode, int communicationInterval, int heartbeatInterval, String firmwareVersion) {}
+      @Schema(example = "ATTENDANCE") String readerMode, @Schema(example = "30") int communicationInterval, @Schema(example = "60") int heartbeatInterval, @Schema(example = "2.4.1") String firmwareVersion) {}
 
   /**
    * A reader. {@code status}: REGISTERED, ACTIVE, DEGRADED, OFFLINE, INACTIVE or MAINTENANCE.
@@ -30,15 +31,15 @@ public final class IotResources {
    * {@code availableActions} from ACTIVATE, DEACTIVATE, START_MAINTENANCE, END_MAINTENANCE.
    */
   public record ReaderResource(
-      String id,
-      String name,
-      String deviceType,
-      String spaceId,
-      String status,
+      @Schema(example = "RDR-A-301") String id,
+      @Schema(example = "Lector Aula A-301") String name,
+      @Schema(example = "CLASSROOM_READER") String deviceType,
+      @Schema(example = "sp-a301") String spaceId,
+      @Schema(example = "ACTIVE") String status,
       ConfigurationResource configuration,
-      LocalDateTime registeredAt,
-      LocalDateTime lastSeenAt,
-      List<String> availableActions) {
+      @Schema(example = "2026-08-10T09:00:00") LocalDateTime registeredAt,
+      @Schema(example = "2026-10-07T09:49:30") LocalDateTime lastSeenAt,
+      @Schema(example = "[\"DEACTIVATE\",\"START_MAINTENANCE\"]") List<String> availableActions) {
 
     public static ReaderResource from(Reader reader) {
       return new ReaderResource(
@@ -67,13 +68,13 @@ public final class IotResources {
 
   /** {@code signalStrength} in dBm (closer to 0 is better), {@code uptime} in seconds. */
   public record TelemetryResource(
-      String id,
-      String readerId,
-      LocalDateTime capturedAt,
-      int signalStrength,
-      long uptime,
-      String firmwareVersion,
-      String status) {
+      @Schema(example = "tel-00267") String id,
+      @Schema(example = "RDR-A-301") String readerId,
+      @Schema(example = "2026-10-07T09:49:30") LocalDateTime capturedAt,
+      @Schema(example = "-48") int signalStrength,
+      @Schema(example = "186570") long uptime,
+      @Schema(example = "2.4.1") String firmwareVersion,
+      @Schema(example = "ACTIVE") String status) {
 
     public static TelemetryResource from(TelemetrySample sample) {
       return new TelemetryResource(
@@ -92,12 +93,12 @@ public final class IotResources {
    * {@code resolvedAt} is null while the incident is open.
    */
   public record IncidentResource(
-      String id,
-      String readerId,
-      String type,
-      LocalDateTime detectedAt,
-      String description,
-      LocalDateTime resolvedAt) {
+      @Schema(example = "inc-00380") String id,
+      @Schema(example = "RDR-T-002") String readerId,
+      @Schema(example = "CONNECTIVITY_FAILURE") String type,
+      @Schema(example = "2026-10-05T07:05:00") LocalDateTime detectedAt,
+      @Schema(example = "The reader has not sent heartbeats since 2026-10-05T07:00:00.") String description,
+      @Schema(example = "2026-10-05T07:20:00") LocalDateTime resolvedAt) {
 
     public static IncidentResource from(Incident incident) {
       return new IncidentResource(
@@ -118,18 +119,18 @@ public final class IotResources {
    * {@code source}: READER or SIMULATOR.
    */
   public record TapEventResource(
-      String id,
-      String cursor,
-      String readerId,
-      String cardUid,
-      LocalDateTime tappedAt,
-      String outcome,
-      String tone,
-      String messageKey,
+      @Schema(example = "07b3d078-c9a5-48b6-9f91-6bcd3d880d7e") String id,
+      @Schema(example = "248") String cursor,
+      @Schema(example = "RDR-A-301") String readerId,
+      @Schema(example = "01:02:03:04") String cardUid,
+      @Schema(example = "2026-10-07T10:00:00") LocalDateTime tappedAt,
+      @Schema(example = "ATTENDANCE") String outcome,
+      @Schema(example = "success") String tone,
+      @Schema(example = "tap.attendanceTaken") String messageKey,
       Map<String, Object> messageParams,
-      String displayMessage,
-      String source,
-      boolean buffered) {
+      @Schema(example = "Asistencia tomada · Aplicaciones Web · 10:00–11:30") String displayMessage,
+      @Schema(example = "READER") String source,
+      @Schema(example = "false") boolean buffered) {
 
     private static final TypeReference<Map<String, Object>> PARAMS = new TypeReference<>() {};
 
@@ -159,21 +160,21 @@ public final class IotResources {
   }
 
   /** A page of tap events, newest first, and the cursor to send as {@code after} on the next poll. */
-  public record TapEventPage(List<TapEventResource> items, String nextCursor) {}
+  public record TapEventPage(List<TapEventResource> items, @Schema(example = "248") String nextCursor) {}
 
   /** {@code errors} lists the rules that failed, see the error table of the API guide. */
   public record ConfigurationRequest(
-      ReaderMode readerMode,
-      Integer communicationInterval,
-      Integer heartbeatInterval,
-      String firmwareVersion) {}
+      @Schema(example = "ATTENDANCE") ReaderMode readerMode,
+      @Schema(example = "30") Integer communicationInterval,
+      @Schema(example = "60") Integer heartbeatInterval,
+      @Schema(example = "2.4.1") String firmwareVersion) {}
 
   public record RegisterReaderRequest(
-      @NotBlank String id,
-      @NotBlank String name,
-      @NotNull DeviceType deviceType,
-      @NotBlank String spaceId,
+      @Schema(example = "RDR-A-310") @NotBlank String id,
+      @Schema(example = "Lector Aula A-310") @NotBlank String name,
+      @Schema(example = "CLASSROOM_READER") @NotNull DeviceType deviceType,
+      @Schema(example = "sp-a303") @NotBlank String spaceId,
       @NotNull @Valid ConfigurationRequest configuration) {}
 
-  public record TapRequest(@NotBlank String cardUid) {}
+  public record TapRequest(@Schema(example = "01:02:03:04") @NotBlank String cardUid) {}
 }
