@@ -1,5 +1,6 @@
 package com.pafisolutions.tarjepafi.credentials.interfaces.rest;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.pafisolutions.tarjepafi.credentials.application.CredentialService.CredentialView;
 import com.pafisolutions.tarjepafi.credentials.application.EnrollmentVerificationService;
 import com.pafisolutions.tarjepafi.credentials.domain.model.CampusSettings;
@@ -19,13 +20,13 @@ public final class CredentialResources {
 
   /** {@code role}: STUDENT, TEACHER or STAFF. {@code enrollmentStatus}: COMPLETED or PENDING, null unless a student. */
   public record CardHolderResource(
-      String id,
-      String code,
-      String fullName,
-      String email,
-      String role,
-      String program,
-      String enrollmentStatus) {
+      @Schema(example = "ch-u202312966") String id,
+      @Schema(example = "U202312966") String code,
+      @Schema(example = "Ana Torres") String fullName,
+      @Schema(example = "u202312966@upc.edu.pe") String email,
+      @Schema(example = "STUDENT") String role,
+      @Schema(example = "Ingenieria de Software") String program,
+      @Schema(example = "COMPLETED") String enrollmentStatus) {
 
     public static CardHolderResource from(CardHolder holder) {
       return new CardHolderResource(
@@ -45,14 +46,14 @@ public final class CredentialResources {
    * BLOCK, REPORT_LOST, DEACTIVATE, REACTIVATE.
    */
   public record CredentialResource(
-      String id,
-      String cardUid,
-      String cardHolderId,
-      String status,
-      LocalDateTime issuedAt,
-      LocalDateTime statusChangedAt,
-      LocalDateTime lastUsedAt,
-      List<String> availableActions,
+      @Schema(example = "cred-001") String id,
+      @Schema(example = "04:3D:9B:12:8F") String cardUid,
+      @Schema(example = "ch-u202312966") String cardHolderId,
+      @Schema(example = "ACTIVE") String status,
+      @Schema(example = "2026-03-01T09:00:00") LocalDateTime issuedAt,
+      @Schema(example = "2026-03-01T09:00:00") LocalDateTime statusChangedAt,
+      @Schema(example = "2026-10-07T09:50:00") LocalDateTime lastUsedAt,
+      @Schema(example = "[\"BLOCK\",\"DEACTIVATE\",\"REPORT_LOST\"]") List<String> availableActions,
       CardHolderResource holder) {
 
     public static CredentialResource from(CredentialView view) {
@@ -75,14 +76,14 @@ public final class CredentialResources {
    * LOST or MANUAL. {@code changedBy} is a user id or SYSTEM. Linking a holder keeps the status.
    */
   public record StatusChangeResource(
-      String id,
-      String credentialId,
-      String fromStatus,
-      String toStatus,
-      String reason,
-      String changedBy,
-      LocalDateTime changedAt,
-      String note) {
+      @Schema(example = "csh-0001") String id,
+      @Schema(example = "cred-001") String credentialId,
+      @Schema(example = "ACTIVE") String fromStatus,
+      @Schema(example = "BLOCKED") String toStatus,
+      @Schema(example = "MANUAL") String reason,
+      @Schema(example = "usr-001") String changedBy,
+      @Schema(example = "2026-10-05T12:00:00") LocalDateTime changedAt,
+      @Schema(example = "Tarjeta bloqueada por solicitud del estudiante") String note) {
 
     public static StatusChangeResource from(CredentialStatusChange change) {
       return new StatusChangeResource(
@@ -98,7 +99,7 @@ public final class CredentialResources {
   }
 
   /** An access exception of a card for a space; {@code effect}: ALLOW or DENY. */
-  public record PermissionResource(String id, String credentialId, String spaceId, String effect) {
+  public record PermissionResource(@Schema(example = "perm-001") String id, @Schema(example = "cred-001") String credentialId, @Schema(example = "sp-lab-e") String spaceId, @Schema(example = "ALLOW") String effect) {
 
     public static PermissionResource from(CredentialPermission permission) {
       return new PermissionResource(
@@ -110,7 +111,7 @@ public final class CredentialResources {
   }
 
   public record SettingsResource(
-      String term, LocalDateTime enrollmentDeadline, int defaultToleranceMinutes) {
+      @Schema(example = "2026-2") String term, @Schema(example = "2026-10-03T23:59:59") LocalDateTime enrollmentDeadline, @Schema(example = "10") int defaultToleranceMinutes) {
 
     public static SettingsResource from(CampusSettings settings) {
       return new SettingsResource(
@@ -123,12 +124,12 @@ public final class CredentialResources {
    * the preview, would be) deactivated.
    */
   public record EnrollmentVerificationResource(
-      LocalDateTime executedAt,
-      LocalDateTime deadline,
-      boolean deadlinePassed,
+      @Schema(example = "2026-10-07T10:00:00") LocalDateTime executedAt,
+      @Schema(example = "2026-10-03T23:59:59") LocalDateTime deadline,
+      @Schema(example = "true") boolean deadlinePassed,
       List<CredentialResource> deactivated,
-      int unchangedCount,
-      int failedCount) {
+      @Schema(example = "40") int unchangedCount,
+      @Schema(example = "0") int failedCount) {
 
     public static EnrollmentVerificationResource from(EnrollmentVerificationService.Summary summary) {
       return new EnrollmentVerificationResource(
@@ -142,9 +143,9 @@ public final class CredentialResources {
   }
 
   /** Optional body of block, report-lost, deactivate and reactivate. The note is required to block. */
-  public record StatusChangeRequest(String note) {}
+  public record StatusChangeRequest(@Schema(example = "Solicitud del estudiante") String note) {}
 
-  public record LinkHolderRequest(@NotBlank String holderCode) {}
+  public record LinkHolderRequest(@Schema(example = "U202312966") @NotBlank String holderCode) {}
 
-  public record PermissionRequest(@NotNull PermissionEffect effect) {}
+  public record PermissionRequest(@Schema(example = "ALLOW") @NotNull PermissionEffect effect) {}
 }

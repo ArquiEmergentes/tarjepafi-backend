@@ -1,5 +1,6 @@
 package com.pafisolutions.tarjepafi.iam.interfaces.rest;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.pafisolutions.tarjepafi.iam.application.AuthenticationService;
 import com.pafisolutions.tarjepafi.shared.application.security.AuthenticatedUser;
 import com.pafisolutions.tarjepafi.shared.domain.BusinessRuleException;
@@ -21,9 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Authentication")
 public class AuthController {
 
-  public record SignInResource(@NotBlank String email, @NotBlank String password) {}
+  public record SignInResource(@Schema(example = "docente@upc.edu.pe") @NotBlank String email, @Schema(example = "Docente123*") @NotBlank String password) {}
 
-  public record AuthenticatedUserResource(String token, UserResource user) {}
+  public record AuthenticatedUserResource(@Schema(example = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c3ItMDAyIn0.firma") String token, UserResource user) {}
 
   private final AuthenticationService authentication;
 

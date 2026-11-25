@@ -1,5 +1,6 @@
 package com.pafisolutions.tarjepafi.academicattendance.interfaces.rest;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.pafisolutions.tarjepafi.academicattendance.application.TeacherWorkspaceService;
 import com.pafisolutions.tarjepafi.academicattendance.domain.model.AttendanceRecord;
 import com.pafisolutions.tarjepafi.academicattendance.domain.model.AttendanceStatus;
@@ -20,16 +21,16 @@ public final class AttendanceResources {
 
   /** {@code type}: CLASS or MEETING. {@code status}: SCHEDULED, IN_PROGRESS or FINISHED. */
   public record SessionResource(
-      String id,
-      String type,
-      String scheduleId,
-      String title,
-      String spaceId,
-      LocalDate date,
-      LocalDateTime scheduledStart,
-      LocalDateTime scheduledEnd,
-      int toleranceMinutes,
-      String status) {
+      @Schema(example = "ses-02-7") String id,
+      @Schema(example = "CLASS") String type,
+      @Schema(example = "sch-02") String scheduleId,
+      @Schema(example = "Aplicaciones Web · SW51") String title,
+      @Schema(example = "sp-a301") String spaceId,
+      @Schema(example = "2026-10-07") LocalDate date,
+      @Schema(example = "2026-10-07T10:00:00") LocalDateTime scheduledStart,
+      @Schema(example = "2026-10-07T11:30:00") LocalDateTime scheduledEnd,
+      @Schema(example = "10") int toleranceMinutes,
+      @Schema(example = "IN_PROGRESS") String status) {
 
     public static SessionResource from(Session session) {
       return new SessionResource(
@@ -46,7 +47,7 @@ public final class AttendanceResources {
     }
   }
 
-  public record CourseResource(String id, String code, String name, String subject, String section) {
+  public record CourseResource(@Schema(example = "crs-01") String id, @Schema(example = "1ASI0728") String code, @Schema(example = "Aplicaciones Web") String name, @Schema(example = "Desarrollo de Software") String subject, @Schema(example = "SW51") String section) {
 
     static CourseResource from(Course course, ClassSchedule schedule) {
       return course == null
@@ -65,21 +66,21 @@ public final class AttendanceResources {
    * TEACHER_EDIT or SYSTEM. {@code cursor} grows with every new record (poll with it).
    */
   public record AttendanceRecordResource(
-      String id,
-      long cursor,
-      String tapEventId,
-      String sessionId,
-      String cardHolderId,
-      String role,
-      LocalDateTime checkInAt,
-      LocalDateTime checkOutAt,
-      Integer durationMinutes,
-      String status,
-      LocalDateTime confirmedAt,
-      String source,
-      String modifiedBy,
-      LocalDateTime modifiedAt,
-      String editReason) {
+      @Schema(example = "att-01004") String id,
+      @Schema(example = "105") long cursor,
+      @Schema(example = "07b3d078-c9a5-48b6-9f91-6bcd3d880d7e") String tapEventId,
+      @Schema(example = "ses-02-7") String sessionId,
+      @Schema(example = "ch-u202312966") String cardHolderId,
+      @Schema(example = "STUDENT") String role,
+      @Schema(example = "2026-10-07T10:02:00") LocalDateTime checkInAt,
+      @Schema(example = "2026-10-07T11:20:00") LocalDateTime checkOutAt,
+      @Schema(example = "78") Integer durationMinutes,
+      @Schema(example = "PRESENT") String status,
+      @Schema(example = "2026-10-07T10:03:00") LocalDateTime confirmedAt,
+      @Schema(example = "NFC") String source,
+      @Schema(example = "usr-002") String modifiedBy,
+      @Schema(example = "2026-10-07T11:40:00") LocalDateTime modifiedAt,
+      @Schema(example = "El lector no registro su tarjeta") String editReason) {
 
     public static AttendanceRecordResource from(AttendanceRecord record) {
       if (record == null) {
@@ -106,7 +107,7 @@ public final class AttendanceResources {
 
   /** Students per status; {@code unmarked} are enrolled students without a record. */
   public record CountsResource(
-      int pending, int present, int late, int absent, int justified, int unmarked, int total) {
+      @Schema(example = "0") int pending, @Schema(example = "1") int present, @Schema(example = "1") int late, @Schema(example = "17") int absent, @Schema(example = "1") int justified, @Schema(example = "0") int unmarked, @Schema(example = "20") int total) {
 
     static CountsResource from(TeacherWorkspaceService.Counts counts) {
       return new CountsResource(
@@ -136,7 +137,7 @@ public final class AttendanceResources {
   }
 
   public record RosterRowResource(
-      String cardHolderId, String fullName, String code, AttendanceRecordResource record) {}
+      @Schema(example = "ch-u202312966") String cardHolderId, @Schema(example = "Ana Torres") String fullName, @Schema(example = "U202312966") String code, AttendanceRecordResource record) {}
 
   public record SessionDetailResource(
       SessionResource session,
@@ -169,13 +170,13 @@ public final class AttendanceResources {
   public record ClassAttendanceResource(
       AttendanceRecordResource record, SessionResource session, CourseResource course) {}
 
-  public record AttendanceRecordPage(List<AttendanceRecordResource> items, String nextCursor) {}
+  public record AttendanceRecordPage(List<AttendanceRecordResource> items, @Schema(example = "105") String nextCursor) {}
 
   /** {@code status}: PRESENT, LATE, ABSENT or JUSTIFIED. */
   public record EditAttendanceRequest(
-      @NotNull AttendanceStatus status, @NotBlank @Size(max = 255) String reason) {}
+      @Schema(example = "PRESENT") @NotNull AttendanceStatus status, @Schema(example = "El lector no registro su tarjeta") @NotBlank @Size(max = 255) String reason) {}
 
-  public record JustifyRequest(@NotBlank @Size(max = 255) String reason) {}
+  public record JustifyRequest(@Schema(example = "Certificado medico") @NotBlank @Size(max = 255) String reason) {}
 
-  public record ConfirmedResource(int confirmed) {}
+  public record ConfirmedResource(@Schema(example = "3") int confirmed) {}
 }

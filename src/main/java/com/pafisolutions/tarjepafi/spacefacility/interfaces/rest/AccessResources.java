@@ -1,5 +1,6 @@
 package com.pafisolutions.tarjepafi.spacefacility.interfaces.rest;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.pafisolutions.tarjepafi.spacefacility.application.AccessQueryService;
 import com.pafisolutions.tarjepafi.spacefacility.domain.model.AccessRecord;
 import com.pafisolutions.tarjepafi.spacefacility.domain.model.WorkShift;
@@ -20,18 +21,18 @@ public final class AccessResources {
    * SPACE_IN_MAINTENANCE. {@code cursor} grows with every new record (poll with it).
    */
   public record AccessRecordResource(
-      String id,
-      long cursor,
-      String tapEventId,
-      String cardUid,
-      String credentialId,
-      String cardHolderId,
-      String spaceId,
-      String readerId,
-      String accessType,
-      String decision,
-      String denialReason,
-      LocalDateTime attemptedAt) {
+      @Schema(example = "acc-00442") String id,
+      @Schema(example = "120") long cursor,
+      @Schema(example = "evt-00440") String tapEventId,
+      @Schema(example = "04:3D:9B:12:8F") String cardUid,
+      @Schema(example = "cred-001") String credentialId,
+      @Schema(example = "ch-u202312966") String cardHolderId,
+      @Schema(example = "sp-ent-01") String spaceId,
+      @Schema(example = "RDR-T-001") String readerId,
+      @Schema(example = "CAMPUS_ENTRY") String accessType,
+      @Schema(example = "GRANTED") String decision,
+      @Schema(example = "NONE") String denialReason,
+      @Schema(example = "2026-10-05T07:17:18") LocalDateTime attemptedAt) {
 
     static AccessRecordResource from(AccessRecord record) {
       return new AccessRecordResource(
@@ -50,18 +51,18 @@ public final class AccessResources {
     }
   }
 
-  public record AccessRecordPage(List<AccessRecordResource> items, String nextCursor) {}
+  public record AccessRecordPage(List<AccessRecordResource> items, @Schema(example = "120") String nextCursor) {}
 
   /** {@code status}: OPEN or CLOSED; {@code workedMinutes} is null while OPEN. */
   public record WorkShiftResource(
-      String id,
-      long cursor,
-      String cardHolderId,
-      LocalDate date,
-      LocalDateTime entryAt,
-      LocalDateTime exitAt,
-      Integer workedMinutes,
-      String status) {
+      @Schema(example = "ws-01261") String id,
+      @Schema(example = "19") long cursor,
+      @Schema(example = "ch-t0001") String cardHolderId,
+      @Schema(example = "2026-10-05") LocalDate date,
+      @Schema(example = "2026-10-05T06:54:51") LocalDateTime entryAt,
+      @Schema(example = "2026-10-05T15:01:51") LocalDateTime exitAt,
+      @Schema(example = "487") Integer workedMinutes,
+      @Schema(example = "CLOSED") String status) {
 
     static WorkShiftResource from(WorkShift shift) {
       return new WorkShiftResource(
@@ -77,7 +78,7 @@ public final class AccessResources {
   }
 
   /** {@code tracked} is false when the occupancy of that space is not counted (only the campus is). */
-  public record OccupancyResource(int capacity, int currentOccupancy, boolean isFull, boolean tracked) {
+  public record OccupancyResource(@Schema(example = "600") int capacity, @Schema(example = "132") int currentOccupancy, @Schema(example = "false") boolean isFull, @Schema(example = "true") boolean tracked) {
 
     static OccupancyResource from(AccessQueryService.Occupancy occupancy) {
       return new OccupancyResource(
@@ -86,21 +87,21 @@ public final class AccessResources {
   }
 
   public record PresenceResource(
-      LocalDateTime entryAt, LocalDateTime exitAt, Integer durationMinutes, String status) {}
+      @Schema(example = "2026-10-05T07:17:18") LocalDateTime entryAt, @Schema(example = "2026-10-05T12:40:00") LocalDateTime exitAt, @Schema(example = "323") Integer durationMinutes, @Schema(example = "CLOSED") String status) {}
 
-  public record PresencesResource(List<PresenceResource> items, int totalMinutes) {}
+  public record PresencesResource(List<PresenceResource> items, @Schema(example = "323") int totalMinutes) {}
 
   public record CreateSpaceRequest(
-      @NotBlank String code,
-      @NotBlank String name,
-      @NotBlank String type,
-      @NotBlank String building,
-      int floor,
-      @Min(0) int capacity,
-      @NotBlank String accessPolicy,
-      List<String> allowedRoles) {}
+      @Schema(example = "EVT-01") @NotBlank String code,
+      @Schema(example = "Auditorio") @NotBlank String name,
+      @Schema(example = "EVENT_VENUE") @NotBlank String type,
+      @Schema(example = "Pabellón A") @NotBlank String building,
+      @Schema(example = "1") int floor,
+      @Schema(example = "300") @Min(0) int capacity,
+      @Schema(example = "OPEN") @NotBlank String accessPolicy,
+      @Schema(example = "[\"STUDENT\",\"TEACHER\"]") List<String> allowedRoles) {}
 
-  public record UpdateSpaceStatusRequest(@NotBlank String status) {}
+  public record UpdateSpaceStatusRequest(@Schema(example = "MAINTENANCE") @NotBlank String status) {}
 
-  public record UpdateAccessPolicyRequest(@NotBlank String accessPolicy, List<String> allowedRoles) {}
+  public record UpdateAccessPolicyRequest(@Schema(example = "RESTRICTED") @NotBlank String accessPolicy, @Schema(example = "[\"STAFF\"]") List<String> allowedRoles) {}
 }

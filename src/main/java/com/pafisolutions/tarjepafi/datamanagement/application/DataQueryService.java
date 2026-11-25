@@ -41,7 +41,9 @@ public class DataQueryService {
 
   public record RecordPage(List<DataRecord> items, String nextCursor) {}
 
-  public record HourCount(String hour, int count) {}
+  public record HourCount(
+      @io.swagger.v3.oas.annotations.media.Schema(example = "09") String hour,
+      @io.swagger.v3.oas.annotations.media.Schema(example = "14") int count) {}
 
   /** The figures of one day. {@code attendanceRate} is null when nothing was resolved. */
   public record Dashboard(

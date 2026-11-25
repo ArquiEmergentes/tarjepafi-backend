@@ -1,5 +1,6 @@
 package com.pafisolutions.tarjepafi.academicattendance.interfaces.rest;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.pafisolutions.tarjepafi.academicattendance.domain.model.ClassSchedule;
 import com.pafisolutions.tarjepafi.academicattendance.domain.model.Course;
 import com.pafisolutions.tarjepafi.academicattendance.domain.model.Enrollment;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Transactional(readOnly = true)
 public class CatalogueController {
 
-  public record CourseResource(String id, String code, String name, String subject) {
+  public record CourseResource(@Schema(example = "crs-01") String id, @Schema(example = "1ASI0728") String code, @Schema(example = "Aplicaciones Web") String name, @Schema(example = "Desarrollo de Software") String subject) {
     static CourseResource from(Course course) {
       return new CourseResource(
           course.getId(), course.getCode(), course.getName(), course.getSubject());
@@ -31,15 +32,15 @@ public class CatalogueController {
 
   /** {@code dayOfWeek}: 1 = Monday ... 7 = Sunday. Times are {@code HH:mm}. */
   public record ClassScheduleResource(
-      String id,
-      String courseId,
-      String section,
-      String teacherId,
-      String spaceId,
-      int dayOfWeek,
-      String startTime,
-      String endTime,
-      String term) {
+      @Schema(example = "sch-02") String id,
+      @Schema(example = "crs-01") String courseId,
+      @Schema(example = "SW51") String section,
+      @Schema(example = "ch-d0001") String teacherId,
+      @Schema(example = "sp-a301") String spaceId,
+      @Schema(example = "3") int dayOfWeek,
+      @Schema(example = "10:00") String startTime,
+      @Schema(example = "11:30") String endTime,
+      @Schema(example = "2026-2") String term) {
     static ClassScheduleResource from(ClassSchedule schedule) {
       return new ClassScheduleResource(
           schedule.getId(),
@@ -56,7 +57,7 @@ public class CatalogueController {
 
   /** {@code status}: ACTIVE or WITHDRAWN. */
   public record EnrollmentResource(
-      String id, String studentId, String scheduleId, String term, String status) {
+      @Schema(example = "enr-00022") String id, @Schema(example = "ch-u202312966") String studentId, @Schema(example = "sch-01") String scheduleId, @Schema(example = "2026-2") String term, @Schema(example = "ACTIVE") String status) {
     static EnrollmentResource from(Enrollment enrollment) {
       return new EnrollmentResource(
           enrollment.getId(),

@@ -168,8 +168,8 @@ API with `python scripts/evidence/endpoint_inventory.py <api host>`.
 - The daily enrollment verification is off in the demo profile (it deactivated cards when it ran with the demo clock past
   the deadline); the administrator runs it by hand.
 - The sign-in lock and the per-address limit live in memory: they fit a single instance.
-- Request and response examples in Swagger are not written for every endpoint yet (summaries, descriptions and error codes
-  are); `docs/API.md` and the `.http` files carry the examples.
+- Swagger carries an example for every field of every request and response model (checked by `OpenApiDocumentationTests`, so a new
+  field without one fails the build), a `Problem` response on every route and a description of how to sign in and authorize.
 
 ## 8. How to check it again
 
